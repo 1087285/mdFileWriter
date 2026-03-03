@@ -18,3 +18,8 @@ project/src/dist/
 
 # Keep persistent database in Git
 !project/src/backend/database.json
+
+# Node.js / Electron
+project/node_modules/
+project/dist/
+project/package-lock.json
