@@ -15,6 +15,7 @@ const mockGetMarkdown = jest.fn();
 class MockEditor {
     constructor(options) {
         this.options = options;
+        MockEditor.lastInstance = this;
         // Simulate change event listener registration
         if (options.events && options.events.change) {
             this.changeHandler = options.events.change;
@@ -23,7 +24,9 @@ class MockEditor {
     setMarkdown(md) { mockSetMarkdown(md); }
     getMarkdown() { return mockGetMarkdown(); }
     exec() {}
+    changeMode() {}
 }
+MockEditor.lastInstance = null;
 global.toastui = { Editor: MockEditor };
 
 // Mock Preload API
@@ -149,5 +152,69 @@ describe('Integration: Renderer -> IPC', () => {
          
          expect(mockApi.showConfirm).toHaveBeenCalled();
          expect(mockApi.deletePath).toHaveBeenCalledWith('/test/root/file1.md');
+    });
+
+    test('IT-IPC-004: Create New File', async () => {
+        mockApi.createFile.mockResolvedValue('/test/root/NewFile_xxx.md');
+        mockApi.readDir.mockResolvedValue([
+            { name: 'NewFile_xxx.md', isDirectory: false, path: '/test/root/NewFile_xxx.md' }
+        ]);
+
+        const btn = document.getElementById('btn-new');
+        btn.click();
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(mockApi.createFile).toHaveBeenCalled();
+        expect(mockApi.readDir).toHaveBeenCalled();
+    });
+
+    test('IT-IPC-006: Rename File', async () => {
+        // Setup: manually add a selected item to the tree
+        const fileTree = document.getElementById('file-tree');
+        const ul = document.createElement('ul');
+        const li = document.createElement('li');
+        li.title = '/test/root/file2.md';
+        li.classList.add('selected');
+        const span = document.createElement('span');
+        span.textContent = '\uD83D\uDCC4 file2.md';
+        li.appendChild(span);
+        ul.appendChild(li);
+        fileTree.innerHTML = '';
+        fileTree.appendChild(ul);
+
+        global.prompt = jest.fn().mockReturnValue('renamed.md');
+        mockApi.renamePath.mockResolvedValue();
+        mockApi.readDir.mockResolvedValue([
+            { name: 'renamed.md', isDirectory: false, path: '/test/root/renamed.md' }
+        ]);
+
+        const btn = document.getElementById('btn-rename');
+        btn.click();
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(mockApi.renamePath).toHaveBeenCalledWith(
+            '/test/root/file2.md',
+            expect.stringContaining('renamed.md')
+        );
+    });
+
+    test('IT-STATE-001: Unsaved indicator shown on editor change', async () => {
+        const unsaved = document.getElementById('unsaved-indicator');
+        // After save from IT-IPC-003, indicator should be hidden
+        expect(unsaved.style.display).toBe('none');
+
+        // Trigger the editor's change event via the captured instance
+        const editorInst = MockEditor.lastInstance;
+        expect(editorInst).not.toBeNull();
+        if (editorInst && editorInst.changeHandler) {
+            editorInst.changeHandler();
+        }
+
+        await new Promise(r => setTimeout(r, 50));
+
+        // Indicator should now be visible
+        expect(unsaved.style.display).toBe('inline');
     });
 });

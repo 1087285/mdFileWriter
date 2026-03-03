@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.0.0 |
+| バージョン | v1.0.1 |
 | リリース日 | 2026-03-03 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -20,9 +20,9 @@
 | 01 要件定義 | ✅ 完了 | |
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
-| 04 実装 | ✅ 完了 | |
-| 05 単体評価 | ✅ 8/8 Pass | 変更後再テスト実施済み (2026-03-03) |
-| 06 結合評価 | ✅ 4/4 Pass | 変更後再テスト実施済み (2026-03-03) |
+| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動） |
+| 05 単体評価 | ✅ 13/13 Pass | 追加テスト（deletePath/renamePath/cancel系）補完済み (2026-03-03) |
+| 06 結合評価 | ✅ 8/8 Pass | 追加テスト（新規作成/リネーム/未保存インジケータ）補完済み (2026-03-03) |
 | 07 システム評価 | ✅ 条件付き合格 | UIの最終確認はWindows実機で行うこと |
 | **総合判定** | **✅ リリース可** | |
 
@@ -75,7 +75,27 @@
 
 ---
 
-## 5. リリースノート (v1.0.0)
+## 5. リリースノート (v1.0.1)
+
+### バグ修正
+- **BUG-04-001**: Linux/devcontainer環境でフォルダ選択ダイアログが開かない不具合を修正
+  - `package.json` の `start` スクリプトに `--no-sandbox --disable-gpu` を追加
+- **BUG-04-002**: `dialog:openFolder` のエラーハンドリング不足を修正
+  - try/catchの追加と `BrowserWindow.getFocusedWindow()` フォールバック
+- **BUG-04-003**: `folderOpenBtn` が null の場合にスクリプトが停止するリスクを修正
+  - nullガードと try/catch の追加
+
+### テスト強化
+- 単体テスト追加（`fs:deletePath` / `fs:renamePath` / `dialog:openFolder` キャンセル系）: +5件
+- 結合テスト追加（新規作成 / リネーム / 未保存インジケータ）: +4件
+- 合計: 12 → 21 件
+
+### 変更なし
+- 機能仕様・UI・IPC API に変更なし
+
+---
+
+## 5-2. リリースノート (v1.0.0)
 
 ### 新機能
 - Markdown (.md) ファイルのWYSIWYG編集に対応（Toast UI Editor採用）
@@ -105,8 +125,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。

@@ -289,13 +289,22 @@ async function renameSelected() {
 /**
  * Event Listeners
  */
-folderOpenBtn.addEventListener('click', async () => {
-    const path = await window.api.openFolder();
-    if (path) {
-        currentRoot = path;
-        renderTree(path);
-    }
-});
+if (folderOpenBtn) {
+    folderOpenBtn.addEventListener('click', async () => {
+        try {
+            const path = await window.api.openFolder();
+            if (path) {
+                currentRoot = path;
+                renderTree(path);
+            }
+        } catch (err) {
+            console.error('openFolder error:', err);
+            alert('フォルダを開けませんでした: ' + err.message);
+        }
+    });
+} else {
+    console.error('folder-open-btn が見つかりません');
+}
 
 btnSave.addEventListener('click', saveFile);
 

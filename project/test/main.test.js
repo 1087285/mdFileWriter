@@ -154,6 +154,58 @@ describe('Main Process Unit Tests', () => {
           expect(result).toBe('/selected/path');
       }
   });
+
+  test('dialog:openFolder should return null when canceled', async () => {
+      dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+      if (handlers['dialog:openFolder']) {
+          const result = await handlers['dialog:openFolder']();
+          expect(result).toBeNull();
+      }
+  });
+
+  test('fs:deletePath should delete a file', async () => {
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => false });
+      fs.promises.unlink = jest.fn().mockResolvedValue(undefined);
+      if (handlers['fs:deletePath']) {
+          await handlers['fs:deletePath']({}, '/test/file.txt');
+          expect(fs.promises.stat).toHaveBeenCalledWith('/test/file.txt');
+          expect(fs.promises.unlink).toHaveBeenCalledWith('/test/file.txt');
+      }
+  });
+
+  test('fs:deletePath should delete a directory recursively', async () => {
+      fs.promises.stat.mockResolvedValue({ isDirectory: () => true });
+      fs.promises.rm = jest.fn().mockResolvedValue(undefined);
+      if (handlers['fs:deletePath']) {
+          await handlers['fs:deletePath']({}, '/test/dir');
+          expect(fs.promises.rm).toHaveBeenCalledWith('/test/dir', { recursive: true, force: true });
+      }
+  });
+
+  test('fs:renamePath should rename path', async () => {
+      // existsSync returns false (target doesn't exist)
+      const origExistsSync = require('fs').existsSync;
+      require('fs').existsSync = jest.fn().mockReturnValue(false);
+      fs.promises.rename.mockResolvedValue(undefined);
+      if (handlers['fs:renamePath']) {
+          await handlers['fs:renamePath']({}, '/test/old.md', '/test/new.md');
+          expect(fs.promises.rename).toHaveBeenCalledWith('/test/old.md', '/test/new.md');
+      }
+      require('fs').existsSync = origExistsSync;
+  });
+
+  test('fs:renamePath should throw when destination exists', async () => {
+      require('fs').existsSync = jest.fn().mockReturnValue(true);
+      if (handlers['fs:renamePath']) {
+          await expect(handlers['fs:renamePath']({}, '/test/old.md', '/test/existing.md'))
+              .rejects.toThrow('Destination already exists');
+      }
+  });
+
+  test('IPC Handler Registration - renamePath and showConfirm', () => {
+      expect(handlers['fs:renamePath']).toBeDefined();
+      expect(handlers['dialog:showConfirm']).toBeDefined();
+  });
   
   test('path validation (indirect)', async () => {
       // Since validatePath is not exported, we can test validation via fs:readDir, etc. if implemented.

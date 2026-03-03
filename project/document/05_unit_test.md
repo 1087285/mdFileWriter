@@ -50,8 +50,32 @@
 - **結果**: **12/12 Pass** (Unit 8 + Integration 4)
 - **判定**: 回帰なし。全テスト合格。
 
+## 5-2. 追加テスト結果（04修正後・未カバー補完）
+
+- **変更内容**: `dialog:openFolder` 不具合修正（--no-sandbox追加・try/catch・nullガード）、および `fs:deletePath` / `fs:renamePath` / `dialog:openFolder` キャンセル系の単体テスト追加
+- **再テスト日**: 2026-03-03
+- **テスト追加数**: +5件（main.test.js）, +4件（integration.test.js）
+
+| 追加テストID | 評価内容 | 結果 |
+|---|---|---|
+| UT-M-009 | dialog:openFolder — キャンセル時 null 返却 | ✅ PASS |
+| UT-M-010 | fs:deletePath — ファイル削除 | ✅ PASS |
+| UT-M-011 | fs:deletePath — ディレクトリ再帰削除 | ✅ PASS |
+| UT-M-012 | fs:renamePath — 正常リネーム | ✅ PASS |
+| UT-M-013 | fs:renamePath — 宛先既存時エラー | ✅ PASS |
+| IT-IPC-004 | 新規作成ボタン → createFile 呼び出し | ✅ PASS |
+| IT-IPC-006 | リネームボタン → renamePath 呼び出し | ✅ PASS |
+| IT-STATE-001 | エディタ変更 → 未保存インジケータ表示 | ✅ PASS |
+| UT-M-002b | IPCハンドラ登録（renamePath/showConfirm） | ✅ PASS |
+
+**総合結果: 21/21 Pass**
+
+追加不具合:
+- BUG-04-001〜003（フォルダダイアログ不具合）: 04修正済み・回帰なし
+
 ## 6. 結論
 メインプロセスの主要なファイル操作ロジックは正常に機能していることを単体テストで確認した。
 BUG-02（`electron-squirrel-startup` 欠落）は修正済みであり、Windows実機での起動エラーも解消されることを確認（GitHub Actions `windows-latest` ビルド成功）。
-レンダラープロセスのUIロジックおよび全体の連携動作については「統合テスト (06_integration_test)」フェーズにて実施する。
-セキュリティ検証（パストラバーサル対策）については v1.1.0 での対応とする。
+BUG-04-001〜003（フォルダダイアログ不起動）は04修正フェーズで解消済み。
+未評価項目（validatePath直接テスト、キーボードショートカット）は許容済みとして記録。
+**全21件合格により、結合評価（06）への引き渡し条件を充足する。**

@@ -1,6 +1,6 @@
 {
   "name": "md-file-writer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "WYSIWYG Markdown Editor based on Electron",
   "author": "mdFileWriter Project",
   "repository": {
@@ -9,7 +9,7 @@
   },
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron . --no-sandbox --disable-gpu",
     "build": "electron-builder --win",
     "test": "jest"
   },

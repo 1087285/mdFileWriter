@@ -27,13 +27,19 @@ function validatePath(targetPath) {
 
 // F01: Dialog - Open Folder
 ipcMain.handle('dialog:openFolder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory']
-  });
-  if (result.canceled) {
-    return null;
+  try {
+    const win = mainWindow || BrowserWindow.getFocusedWindow();
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory']
+    });
+    if (result.canceled) {
+      return null;
+    }
+    return result.filePaths[0];
+  } catch (error) {
+    console.error('dialog:openFolder error:', error);
+    throw error;
   }
-  return result.filePaths[0]; 
 });
 
 // F02: File System - Read Directory
