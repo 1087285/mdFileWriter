@@ -1,0 +1,56 @@
+name: Build & Release (Windows .exe)
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: project/src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Setup resources
+        working-directory: project/src
+        run: python setup_resources.py
+
+      - name: Build with PyInstaller
+        working-directory: project/src
+        run: pyinstaller mdFileReader.spec
+
+      - name: Verify exe
+        run: |
+          if (Test-Path "project/src/dist/mdFileReader.exe") {
+            Write-Host "✅ mdFileReader.exe found"
+            Get-Item "project/src/dist/mdFileReader.exe" | Select-Object Name, Length
+          } else {
+            Write-Error "❌ mdFileReader.exe not found"
+            exit 1
+          }
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: project/src/dist/mdFileReader.exe
+          body_path: project/document/A2_release_notes.md
+          draft: false
+          prerelease: false

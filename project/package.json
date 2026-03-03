@@ -1,0 +1,24 @@
+{
+  "name": "md-file-writer",
+  "version": "1.0.0",
+  "description": "WYSIWYG Markdown Editor based on Electron",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "dependencies": {
+    "chardet": "^2.0.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.example.mdfilewriter",
+    "productName": "MdFileWriter",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

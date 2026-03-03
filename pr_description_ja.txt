@@ -1,0 +1,26 @@
+概要:
+- 01〜07工程を最新版議事録運用に合わせて完了し、フロント責務分離（CSS/JS外出し）と再評価証跡を最終成果物へ同期しました。
+
+変更点:
+- 議事録入力を `requests/minutes_v*.md`（最新版）参照へ統一し、`README.md` と 01/02 の agent/prompt/skill を更新
+- `project/document/01_requirements.md` v0.7、`02_basic_design.md` v0.7、`03_detailed_design.md` v0.7 へ差分開発情報を反映
+- `project/src/frontend/index.php` からインラインCSS/JSを分離し、`project/src/frontend/styles.css` と `project/src/frontend/app.js` を追加
+- `project/src/test/run_frontend_js_unit_tests.js` を `app.js` 優先読込へ更新（旧方式フォールバック維持）
+- `project/document/04_implementation.md` v1.6、`05_unit_test.md` v1.9、`06_integration_test.md` v1.5、`07_system_test.md` v1.5 を更新
+- 最終管理文書を同期: `project/document/A0_phase_approval_checklist.md` v2.0、`project/document/A1_project_final_summary.md` v1.5、`project/document/A2_release_notes.md` v2.4
+
+確認結果:
+- `node project/src/test/run_frontend_js_unit_tests.js`: `status=ok`, `passed=3/3`
+- `/usr/bin/python3 project/src/test/run_frontend_php_unit_tests.php`: `status=ok`, `passed=4/4`
+- `/usr/bin/python3 project/src/test/run_mcdc_supplement_tests.py`: `status=ok`, `passed=8/8`
+- `/usr/bin/python3 project/src/test/run_json_tests.py`: `status=ok`, `passed=5/5`
+- `php -r '...submit.php...'`: `FE_INVALID_PATH_OK`
+- HTTP確認: `FE_HTTP_INVALID_PATH_OK` / `SYS_FE_INVALID_PATH_OK`
+
+影響範囲:
+- フロント構成（`index.php` + `styles.css` + `app.js`）
+- 単体/結合/システム評価証跡
+- 工程文書および最終管理文書（A0/A1/A2）
+
+残課題/注意事項:
+- リリース判定は「条件付きOK」継続（本番SMTP設定、Windows Server 2019 / XAMPP実機での最終確認が未了）
