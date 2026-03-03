@@ -22,4 +22,3 @@ project/src/dist/
 # Node.js / Electron
 project/node_modules/
 project/dist/
-project/package-lock.json
