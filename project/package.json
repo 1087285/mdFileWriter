@@ -16,6 +16,7 @@
   "dependencies": {
     "@toast-ui/editor": "^3.2.2",
     "chardet": "^2.0.0",
+    "electron-squirrel-startup": "^1.0.1",
     "iconv-lite": "^0.6.3"
   },
   "devDependencies": {
