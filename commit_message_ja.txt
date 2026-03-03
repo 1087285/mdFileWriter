@@ -1,18 +1,17 @@
-件名: 01〜07工程完了と最終成果物同期（FE責務分離・再評価反映）
+件名: docs: README.md を全面改訂（プロジェクト概要・使い方・技術スタック等を追加）
 
-概要: 要件〜システム評価までの成果物を最新版議事録運用に合わせて更新し、フロント責務分離実装と05〜07再実行証跡を最終文書へ同期。
+概要: 1行のみだった README.md を全面的に書き直し、アプリの特長・動作環境・使い方・技術スタック・フォルダ構成・開発者向け手順・開発プロセス・ライセンスを追加した。
 
 変更点:
-- 議事録運用を `requests/minutes_v*.md` 最新版参照へ統一（README/agent/prompt/skill を更新）
-- 01〜03工程文書を v130 差分ベースで更新（画面表現要件、FE責務分離、回帰観点を追加）
-- フロント実装を責務分離（`project/src/frontend/index.php` から `styles.css` / `app.js` へ分離）
-- JS単体テストを新構成へ追従（`project/src/test/run_frontend_js_unit_tests.js` を `app.js` 優先読込に更新）
-- 05/06/07 の再実行結果を文書へ反映（単体・結合・システムの追補記録を更新）
-- 最終管理文書を同期（`project/document/A0_phase_approval_checklist.md` v2.0、`project/document/A1_project_final_summary.md` v1.5、`project/document/A2_release_notes.md` v2.4）
+- `README.md`: タイトル誤字修正（`mdFileWritter` → `mdFileWriter`）
+- `README.md`: アプリ概要・特長セクションを追加（WYSIWYG、ファイルツリー、ローカル動作 等）
+- `README.md`: 動作環境テーブルを追加（OS・配布形式・外部依存）
+- `README.md`: 使い方セクションを追加（基本フロー5ステップ、HOWTOUSE.md へのリンク）
+- `README.md`: 技術スタックテーブルを追加（Electron・Toast UI Editor・chardet・electron-builder・Jest）
+- `README.md`: フォルダ構成ツリーを追加
+- `README.md`: 開発者向けセクションを追加（セットアップ・実行・テスト・Windows向けビルド手順）
+- `README.md`: 開発プロセステーブルを追加（01〜08工程と成果物へのリンク）
+- `README.md`: MITライセンス記載を追加
 
 確認結果:
-- `node project/src/test/run_frontend_js_unit_tests.js`: 3/3 OK
-- `/usr/bin/python3 project/src/test/run_mcdc_supplement_tests.py`: 8/8 OK
-- `/usr/bin/python3 project/src/test/run_json_tests.py`: 5/5 OK
-- `php -r '...submit.php...'`: FE_INVALID_PATH_OK
-- HTTP確認: FE_HTTP_INVALID_PATH_OK / SYS_FE_INVALID_PATH_OK
+- 変更対象: README.md のみ（ソースコード・テスト・設定ファイルへの影響なし）
