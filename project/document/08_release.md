@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.3.0 |
+| バージョン | v1.4.0 |
 | リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -20,8 +20,8 @@
 | 01 要件定義 | ✅ 完了 | |
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
-| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク） |
-| 05 単体評価 | ✅ 32/32 Pass | v1.3.0 customHTMLRenderer.hardBreak 対応テスト（IT-MD-005〜006）追加済み。IT-MD-001〜006 全件合格 |
+| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク）・不具合 #2 再対応（v1.4.0: `customHTMLRenderer` 削除・`preprocessMarkdown` `<br>\n` 変換方式に変更） |
+| 05 単体評価 | ✅ 32/32 Pass | v1.4.0 対応テスト（IT-MD-001〜006）全件合格。`customHTMLRenderer` 削除確認・`<br>\n` 変換確認を含む |
 | 06 結合評価 | ✅ 14/14 Pass | 46件全件合格 |
 | 07 システム評価 | ✅ 条件付き合格 | ST-E03 trailing-space WYSIWYG表示はWindows実機確認待ち（Manual:Pending） |
 | **総合判定** | **✅ リリース可** | |
@@ -38,8 +38,8 @@
 | UI (HTML/CSS/JS) | `project/src/renderer/` |
 | ビルド設定 | `project/package.json` (electron-builder) |
 | CI/CDワークフロー | `.github/workflows/build-release.yml` |
-| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.3.0.exe` (GitHub Actionsで生成) |
-| ポータブル実行ファイル | `project/dist/MdFileWriter 1.3.0.exe` (GitHub Actionsで生成) |
+| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.4.0.exe` (GitHub Actionsで生成) |
+| ポータブル実行ファイル | `project/dist/MdFileWriter 1.4.0.exe` (GitHub Actionsで生成) |
 | HOWTOUSEドキュメント | `HOWTOUSE.md` |
 | リリースノート | 本ドキュメント |
 
@@ -75,7 +75,33 @@
 
 ---
 
-## 5-new. リリースノート (v1.3.0)
+## 5-new. リリースノート (v1.4.0)
+
+### バグ修正
+- **Bug #2 再対応: trailing-space（末尾2スペース）WYSIWYGレンダリング修正（方式変更）**
+  - v1.3.0 の `customHTMLRenderer.hardBreak` が Windows 実機の WYSIWYG ProseMirror 描画に有効でないことを確認したため削除
+  - `renderer.js` `preprocessMarkdown()` の変換方式を `/ {2,}\n/g` → `'  \n'`（2スペース正規化）から `/ {2,}\n/g` → `'<br>\n'`（inline HTML 変換）に変更
+  - `setMarkdown()` に `<br>\n` を渡すことで ProseMirror が `hard_break` ノードとして取り込み、WYSIWYG 上で改行として描画される設計
+
+### テスト
+- 単体テスト: 32/32 PASS（IT-MD-005: `customHTMLRenderer` 削除確認、IT-MD-006: trailing-space 1個は非変換確認）
+- 結合テスト: 14/14 PASS（IT-MD-005/006 内容を v1.4.0 方式に更新）
+
+### ドキュメント
+- `03_detailed_design.md`: v1.4.0（`customHTMLRenderer` 削除・`<br>\n` 変換方式を確定仕様化）
+- `04_implementation.md`: v1.4.0（実装内容を記録）
+- `05_unit_test.md`: v1.6.0（32/32 PASS）
+- `06_integration_test.md`: v1.5.0（14/14 PASS）
+- `07_system_test.md`: v1.5.0（ST-E03 Auto:Pass、Manual:Pending）
+- `HOWTOUSE.md`: v1.4.0（trailing-space 注意事項を `<br>\n` 変換方式に更新）
+
+### 既知の制限・保留事項
+- ST-E03 trailing-space `<br>` WYSIWYG表示確認: Windows実機での目視確認が必要（Manual:Pending）
+  - 確認完了後に Bug #2 を正式クローズする
+
+---
+
+## 5-new-prev. リリースノート (v1.3.0)（v1.4.0 にて上書き対応済み）
 
 ### バグ修正
 - **Bug #2対応: trailing-space（末尾2スペース）WYSIWYGレンダリング修正**
@@ -212,8 +238,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.3.0
-   git push origin v1.3.0
+   git tag v1.4.0
+   git push origin v1.4.0
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。
@@ -222,7 +248,7 @@
 ### 6.2. 事前確認チェックリスト（push前）
 
 - [x] `project/package.json` の `version` フィールドがリリースバージョンと一致しているか
-- [x] `project/package.json` の `version` が `1.3.0` であること
+- [x] `project/package.json` の `version` が `1.4.0` であること
 - [x] `08_release.md` のバージョン・日付が正しいか
 - [x] `HOWTOUSE.md` が最終仕様と一致しているか
 - [x] すべてのテストが Pass していることを確認（`npm test`）

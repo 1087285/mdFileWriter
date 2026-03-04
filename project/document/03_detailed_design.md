@@ -7,6 +7,7 @@
 | 1.1.1 | 2026-03-04 | `contextIsolation: false` / `nodeIntegration: true` に修正。renderer.js の `require('@toast-ui/editor')` を有効化。本アプリは完全ローカル動作・外部URLナビゲーションなしのため許容（prosemirror依存パッケージがESM専用ビルドのみでscriptTag UMD方式が不可のため） |
 | 1.2.0 | 2026-03-04 | CommonMark準拠対応。`preprocessMarkdown()`関数仕様を追加。`loadFile`に前処理呼び出しを追加。ツールバーにタスクリストコマンドを追加（基本設計 v1.2.0 対応） |
 | 1.3.0 | 2026-03-04 | 不具合 #2 対応。`initializeEditor` に `customHTMLRenderer.hardBreak` 仕様を追加し、WYSIWYG上でのtrailing-space改行（`<br>`）レンダリングを確定仕様化。`preprocessMarkdown` 仕様の "実装工程で確定" 記述を削除し確定仕様に改訂 |
+| 1.4.0 | 2026-03-04 | 不具合 #2 再対応。Windows実機で v1.3.0 修正（customHTMLRenderer.hardBreak）が WYSIWYG に有効でないことを確認。`customHTMLRenderer.hardBreak` を削除し、`preprocessMarkdown` で `  \n` → `<br>\n` 変換後に `setMarkdown()` へ渡す方式に変更 |
 
 ## 1. ディレクトリ構造・ファイル構成
 ```
@@ -89,7 +90,7 @@ HTML操作とイベントリスナーの設定を行う。
 
 > **[変更] v1.1.1**: `contextIsolation: false` / `nodeIntegration: true` に修正。`renderer.js` の `require('@toast-ui/editor')` は引き続き使用する（変更なし）。prosemirror各パッケージがESM専用ビルドのみであり、scriptタグにUMDロードが不可のため、`nodeIntegration`によるCommonJSロード方式を採用する。
 
-> **[変更] v1.3.0**: 不具合 #2 対応。`customHTMLRenderer.hardBreak` を追加し、WYSIWYG上でのtrailing-space改行レンダリングを確定仕様化。
+> **[変更] v1.4.0**: `customHTMLRenderer.hardBreak` を削除。同オプションは Toast UI Editor のプレビュー / HTML出力にのみ作用し、WYSIWYG ProseMirror 描画には有効でないことが Windows 実機で判明したため。trailing-space 対応は `preprocessMarkdown`（§4.3.3a）単体で実現する。
 
 - `renderer.js` 先頭: `const Editor = require('@toast-ui/editor');`（変更なし）
 - `Editor` を `#editor-container` にインスタンス化。
@@ -97,15 +98,6 @@ HTML操作とイベントリスナーの設定を行う。
   - `initialEditType: 'wysiwyg'`, `previewStyle: 'vertical'`, `height: '100%'`
   - `usageStatistics: false`
   - `toolbarItems: []`
-  - **`customHTMLRenderer`**: `hardBreak` ノードを `<br>` としてレンダリングする。
-    ```javascript
-    customHTMLRenderer: {
-        hardBreak() {
-            return [{ type: 'html', content: '<br>' }];
-        }
-    }
-    ```
-    > Toast UI Editor（ProseMirrorベース）は、Markdown AST の `hardBreak` ノード（CommonMarkにおける trailing-space 改行）をWYSIWYG上で `<br>` として表示するレンダラが未定義の場合、改行なしで表示する。本オプションで明示的に `<br>` レンダリングを指定し、CommonMark準拠の表示を保証する。
 - イベント登録: `change` イベントで `setUnsaved(true)` を呼ぶ。
 
 #### 4.3.2. D&Dファイル自動読み込み (`handleFileDrop`)
@@ -126,15 +118,16 @@ HTML操作とイベントリスナーの設定を行う。
 - タブ/タイトルバーにファイル名表示。
 
 #### 4.3.3a. Markdown前処理 (`preprocessMarkdown`)
-- **目的**: `editor.setMarkdown()` 呼び出し前に、行末スペースを CommonMark 仕様に沿った形式へ正規化する。
+- **目的**: `editor.setMarkdown()` 呼び出し前に、trailing-space（行末スペース2個以上）を Toast UI Editor の WYSIWYG モードが認識する形式に変換する。
 - **署名**: `preprocessMarkdown(content: string): string`
 - **処理内容**:
-  1. **trailing-space正規化**: 正規表現 `/ {2,}(\n)/g` → `'  $1'` で、行末スペース2個以上を正確に2個へ正規化する。これにより `setMarkdown()` に渡す文字列が CommonMark の `hardBreak` 仕様に準拠した状態になる。
-  2. 将来的なCommonMark非互換構文への対応拡張点。
-- **WYSIWYG レンダリング保証**: 文字列の正規化だけでは WYSIWYG 表示が保証されない。`initializeEditor` の `customHTMLRenderer.hardBreak`（§4.3.1）と組み合わせることで、`hardBreak` ノードが WYSIWYG 上で確実に `<br>` として表示される。**本関数と `customHTMLRenderer.hardBreak` は必ずセットで使用すること。**
+  1. **trailing-space → `<br>` 変換**: 正規表現 `/ {2,}\n/g` → `'<br>\n'` で変換する。Toast UI Editor v3 の `setMarkdown()` はインライン HTML（`<br>`）を受け付け、WYSIWYG ProseMirror ドキュメントに `hard_break` ノードとして変換する。
+  2. 将来的なCommonMark非互换構文への実装拡張点。
+- **WYSIWYG レンダリング保証**: `setMarkdown()` へ渡すテキスト内の `<br>` が ProseMirror によって `hard_break` ノードとして解釈され、WYSIWYG 画面上で改行として描画される。`getMarkdown()` での保存時は `hard_break` は `  \n`（trailing-space 2個 + 改行）として復元されるため、CommonMark 形式の保存を保証する。
+- **`customHTMLRenderer` との関係**: v1.4.0 より `customHTMLRenderer.hardBreak` は削除。本関数単体で WYSIWYG trailing-space 対応を完結させる。
 - **テスト観点**:
-  - 文字列正規化: `'  \n'` を含む行は変化なし。`'   \n'`（3スペース以上）は `'  \n'` に正規化されること。
-  - WYSIWYGレンダリング: trailing-space を含む `.md` ファイルをD&Dで開いた際、WYSIWYG上で `<br>` 相当の強制改行として表示されること（Windows実機での目視確認を合否判定の必須条件とする）。
+  - 文字列変換: `'  \n'`（2スペース）を含む行が `'<br>\n'` に変換されること。`'   \n'`（3スペース以上）も `'<br>\n'` に変換されること。スペース1個の行末は変換されないこと。
+  - WYSIWYGレンダリング: trailing-space を含む `.md` ファイルをD&Dで開いた際、WYSIWYG上で `<br>` 相当の強制改行として表示されること（**Windows実機での目視確認を合否判定の必須条件とする**）。
 
 #### 4.3.4. ファイル保存 (`saveFile`)
 - `editor.getMarkdown()` を取得。
@@ -175,6 +168,6 @@ HTML操作とイベントリスナーの設定を行う。
 - **F04 (新規)**: 同名ファイル時のエラー、特殊文字ファイル名の扱い。
 - **E01 (読込)**: Shift-JISファイルが化けずに開けるか。
 - **E02 (編集)**: 太字、リスト等が正常にMarkdownに変換されるか。
-- **E03 (CommonMark準拠)**: 行末スペース2個を含むMDファイル読み込み時、WYSIWYG上で`<br>`相当の改行として表示されるか（`preprocessMarkdown` + `customHTMLRenderer.hardBreak` の組み合わせによる保証）。見出し・表・コードブロック・引用・リンク・画像・水平線が正確にレンダリングされるか。保存後のMDファイルで構文が崩れていないか。Windows実機での目視確認を合否判定の必須条件とする。
+- **E03 (CommonMark準拠)**: 行末スペース2個を含むMDファイル読み込み時、WYSIWYG上で`<br>`相当の改行として表示されるか（`preprocessMarkdown` の `<br>` 変換による保証）。見出し・表・コードブロック・引用・リンク・画像・水平線が正確にレンダリングされるか。保存後のMDファイルで構文が崩れていないか。**Windows実機での目視確認を合否判定の必須条件とする**。
 - **E04 (タスクリスト)**: `- [ ]`/`- [x]`を含むMDファイル読み込み時にチェックボックスとして表示されるか。ツールバーからタスクリストを挿入できるか。保存後のMDファイルに`- [ ]`記法が保存されるか。
 - **E06 (未保存)**: 編集中に `*` が出るか。閉じる時に警告が出るか。

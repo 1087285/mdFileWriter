@@ -30,12 +30,6 @@ function initEditor() {
         previewStyle: 'vertical',
         usageStatistics: false,
         toolbarItems: [],
-        // Fix bug #2: render hardBreak (trailing-space line break) as <br> in WYSIWYG mode
-        customHTMLRenderer: {
-            hardBreak() {
-                return [{ type: 'html', content: '<br>' }];
-            }
-        },
         events: {
             change: () => {
                 if (!isUnsaved) setUnsaved(true);
@@ -88,13 +82,14 @@ function setupDropZone() {
 
 /**
  * Preprocess Markdown for CommonMark compliance
- * Ensures trailing-space line breaks (2+ spaces before \n) are preserved
- * when passed to Toast UI Editor's setMarkdown().
- * Toast UI Editor may strip trailing spaces; this normalizes them to exactly 2.
+ * Converts trailing-space line breaks (2+ spaces before \n) to inline <br>
+ * so that Toast UI Editor's setMarkdown() processes them as hard_break nodes
+ * in the WYSIWYG ProseMirror document, rendering them as visible line breaks.
+ * On save, getMarkdown() restores hard_break nodes as trailing-space (2 spaces + \n).
  */
 function preprocessMarkdown(content) {
-    // Normalize trailing spaces (2 or more) before newline to exactly 2 spaces
-    return content.replace(/ {2,}(\n)/g, '  $1');
+    // Convert trailing spaces (2 or more) before newline to <br>
+    return content.replace(/ {2,}\n/g, '<br>\n');
 }
 
 /**

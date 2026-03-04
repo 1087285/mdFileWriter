@@ -8,12 +8,13 @@
 | 1.2.0 | 2026-03-04 | 実装 v1.1.2 対応（contextIsolation: false・preload.js 直接代入）。BUG-04 追記、基本設計対応表修正 |
 | 1.3.0 | 2026-03-04 | 実装 v1.2.0 対応（trailing-space CommonMark準拠）。IT-MD-001〜004 追記、総合結果・基本設計対応表更新 |
 | 1.4.0 | 2026-03-04 | 実装 v1.3.0 対応（不具合 #2 対応）。IT-MD-005〜006 追記、総合結果・基本設計対応表更新。32/32 PASS 確認 |
+| 1.5.0 | 2026-03-04 | 実装 v1.4.0 対応（不具合 #2 再対応）。`customHTMLRenderer` 削除・`preprocessMarkdown` `<br>\n` 変換方式変更を反映。IT-MD-001〜006 更新・基本設計対応表更新。32/32 PASS 確認 |
 
 ## 1. 評価概要
 
 - **評価対象**: レンダラープロセス (`src/renderer/renderer.js`) ⇔ メインプロセス (`src/main.js`) の IPC 通信結合フロー
 - **評価方法**: Jest + JSDOM による自動テスト（`integration.test.js`）
-- **テスト実施日**: 2026-03-03（初回）/ 2026-03-04（v1.1.2 再確認・v1.2.0 追加確認・v1.3.0 追加確認）
+- **テスト実施日**: 2026-03-03（初回）/ 2026-03-04（v1.1.2 再確認・v1.2.0 追加確認・v1.3.0 追加確認・v1.4.0 再確認）
 - **基本設計参照**: `02_basic_design.md` v1.2.0
 
 ## 2. 評価環境
@@ -47,21 +48,21 @@
 |:--|:--|:--|:--|:--|
 | IT-STATE-001 | 編集変更 → 未保存インジケータ表示 | `editor.change` → `setUnsaved(true)` → `#unsaved-indicator` 表示 | **PASS** | |
 
-### 3.4. Markdown前処理フロー（v1.2.0）
+### 3.4. Markdown前処理フロー（v1.4.0: `<br>\n` 変換方式）
 
 | ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
-| IT-MD-001 | trailing-space 2個維持 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A  \nline B')` | **PASS** | 2スペースはそのまま保持 |
-| IT-MD-002 | trailing-space 3個以上→2スペース正規化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A  \nline B')` | **PASS** | `/ {2,}\n/g` → `'  \n'` |
+| IT-MD-001 | trailing-space 2個 → `<br>\n` 変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A<br>\nline B')` | **PASS** | `/ {2,}\n/g` → `'<br>\n'`（v1.4.0方式） |
+| IT-MD-002 | trailing-space 3個以上も `<br>\n` に変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に `<br>\n` | **PASS** | v1.4.0方式 |
 | IT-MD-003 | trailing-space なしの行は無変化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 入力と同一 | **PASS** | |
-| IT-MD-004 | 複数行混在の全行正規化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 各行を正規化 | **PASS** | |
+| IT-MD-004 | 複数行混在の全行変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 各行を `<br>\n` 変換 | **PASS** | |
 
-### 3.5. customHTMLRenderer.hardBreak フロー（v1.3.0・不具合 #2 対応）
+### 3.5. customHTMLRenderer 削除確認・trailing-space 境界条件フロー（v1.4.0）
 
 | ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
-| IT-MD-005 | `customHTMLRenderer.hardBreak` オプション設定確認 | `initEditor` → `new Editor(options)` → `options.customHTMLRenderer.hardBreak` が関数として存在すること | **PASS** | `MockEditorCtor.lastOptions` で確認 |
-| IT-MD-006 | `hardBreak()` の戻り値確認 | `options.customHTMLRenderer.hardBreak()` → `[{ type: 'html', content: '<br>' }]` を返すこと | **PASS** | WYSIWYG `<br>` レンダリングの設計的保証を確認 |
+| IT-MD-005 | `customHTMLRenderer` が **存在しない**こと（v1.4.0削除確認） | `initEditor` → `new Editor(options)` → `options.customHTMLRenderer` が `undefined` であること | **PASS** | `MockEditorCtor.lastOptions` で確認。v1.4.0にて削除済み |
+| IT-MD-006 | trailing-space 1個の行末は `<br>\n` に変換されないこと | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に trailing-space 1個は `<br>\n` 変換なしで渡される | **PASS** | `/ {2,}\n/g` の正規表現により1個は対象外 |
 
 **総合結果: 14/14 Pass**
 
@@ -77,8 +78,9 @@
 | 未保存変更インジケータ | `change` イベント連動 | ✅ 確認済 |
 | `contextIsolation: false` / `nodeIntegration: true` | `main.js` で設定。`preload.js` の `window.api` 直接代入（`contextBridge` 不使用）。レンダラー内 `require('@toast-ui/editor')` によるライブラリロード | ✅ 確認済（v1.1.2対応） |
 | パストラバーサル対策 | `validatePath` を全ハンドラで呼び出し（UT-V-001〜006 確認済） | ✅ 確認済 |
-| CommonMark準拠: trailing-space改行（v1.2.0） | `preprocessMarkdown` による `/ {2,}\n/g` → `'  \n'` 正規化（IT-MD-001〜004 確認済） | ✅ 確認済 |
-| CommonMark準拠: hardBreak WYSIWYGレンダリング（v1.3.0） | `customHTMLRenderer.hardBreak` が `<br>` を返すよう設定（IT-MD-005〜006 確認済）。実WYSIWYGレンダリングは Windows 実機（ST-E03 Manual）で確認 | ✅ 確認済（ロジック）/ Manual:Pending（実機） |
+| CommonMark準拠: trailing-space改行（v1.4.0） | `preprocessMarkdown` による `/ {2,}\n/g` → `'<br>\n'` 変換（IT-MD-001〜004 確認済）。trailing-space 1個は変換対象外（IT-MD-006 確認済） | ✅ 確認済 |
+| CommonMark準拠: `customHTMLRenderer` 削除（v1.4.0） | `initEditor()` の `Editor` コンストラクタに `customHTMLRenderer` キーが存在しないこと（IT-MD-005 確認済） | ✅ 確認済 |
+| CommonMark準拠: hardBreak WYSIWYG実レンダリング | `setMarkdown('<br>\n'...)` が WYSIWYG 上で改行として表示されること。Windows 実機（ST-E03 Manual）で確認 | Manual:Pending（実機） |
 
 ## 5. 不具合・課題
 
@@ -99,8 +101,8 @@
 
 ## 7. 結論
 
-レンダラープロセスの D&D 読み込み・ファイル操作・未保存検知の各フローにおいて、IPC 結合動作が基本設計 v1.1.0 通りであることを確認した。  
-実装 v1.1.2（`contextIsolation: false` / `window.api` 直接代入）への変更後も BUG-04 が解決され、D&D フローが正常動作することを再確認した。  
+レンダラープロセスの D&D 読み込み・ファイル操作・未保存検知の各フローにおいて、IPC 結合動作が基本設計 v1.2.0 通りであることを確認した。  
+実装 v1.4.0（`preprocessMarkdown` による `<br>\n` 変換方式・`customHTMLRenderer` 削除）への変更後も 32 件全件 PASS を再確認した。  
 単体テスト（32件）と結合テスト（14件）の合計 **46件すべて合格** 。  
-ツールバー実動作・モード切替・ショートカットキーは実機評価（07）に委ねる。  
+ツールバー実動作・モード切替・ショートカットキー・WYSIWYG `<br>` 実表示確認（BUG-02）は実機評価（07）に委ねる。  
 **システム評価（07）への引き渡し条件を充足する。**

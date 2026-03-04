@@ -245,7 +245,7 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
         mockApi.showConfirm.mockResolvedValue(true);
     });
 
-    test('IT-MD-001: trailing-space 2個を含む行を読み込むとき、setMarkdown が行末スペース2個を維持して呼ばれること', async () => {
+    test('IT-MD-001: trailing-space 2個を含む行を読み込むとき、setMarkdown が `<br>\n` に変換して呼ばれること', async () => {
         // CommonMark: "line A  \n" は <br> に変換される
         const input = 'line A  \nline B';
         mockApi.readFile.mockResolvedValue(input);
@@ -256,12 +256,12 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
 
         await new Promise(r => setTimeout(r, 100));
 
-        // 2スペースはそのまま保持されること
-        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B');
+        // 2スペース以上の trailing-space は <br>\n に変換されること
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A<br>\nline B');
     });
 
-    test('IT-MD-002: trailing-space 3個以上を含む行は2スペースに正規化されて setMarkdown が呼ばれること', async () => {
-        // 3スペース → 正規化で2スペースになる
+    test('IT-MD-002: trailing-space 3個以上も `<br>\n` に変換されて setMarkdown が呼ばれること', async () => {
+        // 3スペース → <br>\n に変換される
         const input = 'line A   \nline B';
         mockApi.readFile.mockResolvedValue(input);
 
@@ -271,7 +271,7 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
 
         await new Promise(r => setTimeout(r, 100));
 
-        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B');
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A<br>\nline B');
     });
 
     test('IT-MD-003: trailing-space なしの通常Markdownは前処理で変化しないこと', async () => {
@@ -287,9 +287,9 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
         expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('# Title\nline A\nline B');
     });
 
-    test('IT-MD-004: 複数行で trailing-space が混在するとき、全行に正規化が適用されること', async () => {
-        // line A: 2スペース → 変化なし
-        // line B: 5スペース → 2スペースに正規化
+    test('IT-MD-004: 複数行で trailing-space が混在するとき、全行に `<br>\n` 変換が適用されること', async () => {
+        // line A: 2スペース → <br>\n
+        // line B: 5スペース → <br>\n
         // line C: スペースなし → 変化なし
         const input = 'line A  \nline B     \nline C';
         mockApi.readFile.mockResolvedValue(input);
@@ -300,26 +300,32 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
 
         await new Promise(r => setTimeout(r, 100));
 
-        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B  \nline C');
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A<br>\nline B<br>\nline C');
     });
 });
 
 // ----------------------------------------------------------------
-// v1.3.0: customHTMLRenderer.hardBreak（不具合 #2 対応）テスト
+// v1.4.0: customHTMLRenderer 削除・ preprocessMarkdown <br>変換（不具合 #2 継続対応）
 // ----------------------------------------------------------------
-describe('Integration: customHTMLRenderer.hardBreak v1.3.0 不具合#2対応', () => {
+describe('Integration: preprocessMarkdown v1.4.0 不具合#2再対応', () => {
 
-    test('IT-MD-005: Editor コンストラクタに customHTMLRenderer.hardBreak が渡されていること', () => {
-        // lastOptions は clearAllMocks() に影響されないため安全に参照できる
+    test('IT-MD-005: Editor コンストラクタに customHTMLRenderer が含まれないこと（v1.4.0で削除）', () => {
         const options = MockEditorCtor.lastOptions;
         expect(options).toBeDefined();
-        expect(options.customHTMLRenderer).toBeDefined();
-        expect(typeof options.customHTMLRenderer.hardBreak).toBe('function');
+        expect(options.customHTMLRenderer).toBeUndefined();
     });
 
-    test('IT-MD-006: customHTMLRenderer.hardBreak() が [{ type: "html", content: "<br>" }] を返すこと', () => {
-        const options = MockEditorCtor.lastOptions;
-        const result = options.customHTMLRenderer.hardBreak();
-        expect(result).toEqual([{ type: 'html', content: '<br>' }]);
+    test('IT-MD-006: trailing-space 1個の行末は `<br>` 変換されず setMarkdown に渡されること', async () => {
+        // スペース1個の行末は CommonMark の強制改行ではない（変換しない）
+        const input = 'line A \nline B';
+        mockApi.readFile.mockResolvedValue(input);
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('singlespace.md', '/path/to/singlespace.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A \nline B');
     });
 });

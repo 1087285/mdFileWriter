@@ -3,6 +3,7 @@
 | 版数 | 作成日 | 変更概要 |
 |------|------------|----------------------------------------------|
 | 1.0.0 | 2026-03-04 | 初版作成。不具合 #2 を解析対象として実施。 |
+| 1.1.0 | 2026-03-04 | v1.3.0 修正（customHTMLRenderer.hardBreak）が Windows 実機で効果なしと判明。根本原因・修正案を更新。 |
 
 ---
 
@@ -11,10 +12,12 @@
 | # | 症状概要 | 状態 | 備考 |
 |---|----------|------|------|
 | 1 | mdファイルを読み込んだとき、空白2個が改行として認識しない | 解決済み | `<!-- RESOLVED -->` タグ付与対象（後述） |
-| 2 | WYSIWYG表示でmdファイルを読み込むと、空白2個が改行として認識しない | **未解決（解析対象）** | |
+| 2 | WYSIWYG表示でmdファイルを読み込むと、空白2個が改行として認識しない | **未解決（継続解析中）** | v1.3.0 修正（customHTMLRenderer.hardBreak）適用済みも Windows 実機で効果なし |
 
 > 不具合 #1 は `（解決済み）` と記録されているため解析をスキップする。  
 > `<!-- RESOLVED -->` タグが欠落しているため、本レポート末尾にて `bug/bugs.md` への追記を行う。
+
+> **v1.1.0 追記**: 不具合 #2 は v1.3.0 での修正試行後も未解決のため継続解析対象とする。
 
 ---
 
@@ -22,8 +25,69 @@
 
 ### 不具合 #2: WYSIWYG表示でのtrailing-space改行非認識
 
-- **根本原因工程**: 03 - 詳細設計
-- **根本原因の説明**:
+---
+
+#### ▼ v1.0.0 解析結果（初版：2026-03-04）
+
+- **根本原因工程（初版判定）**: 03 - 詳細設計
+- **根本原因の説明**（初版）:  
+  詳細設計書の `preprocessMarkdown()` 仕様（§4.3.3a）が「trailing-space の正規化」を定めたが、WYSIWYG レンダリングにまで効果を持つかどうかを設計段階で検証・明確化できていなかった。
+
+---
+
+#### ▼ v1.1.0 追加解析（2026-03-04）― v1.3.0 修正後も再現継続
+
+**v1.3.0 修正内容（`customHTMLRenderer.hardBreak` 追加）が機能しない理由**:
+
+Toast UI Editor v3 において `customHTMLRenderer` が作用するのは以下のパイプラインのみである。
+
+| パイプライン | customHTMLRenderer の適用 |
+|---|---|
+| マークダウン → HTML プレビュー（preview panel） | ✅ 適用される |
+| `editor.getHTML()` による HTML 出力 | ✅ 適用される |
+| **WYSIWYG モード（ProseMirror 直接 DOM 描画）** | ❌ **適用されない** |
+
+WYSIWYG モードの描画フロー:
+1. `setMarkdown(content)` → Toast UI Editor 内部 Markdown パーサーが Markdown AST を生成
+2. Markdown AST → **ProseMirror Document** に変換（`toastmark` → ProseMirror converter）
+3. ProseMirror が **ProseMirror Schema の `toDOM` 定義に基づいて直接 DOM をレンダリング**
+4. **`customHTMLRenderer` はこのパイプラインに介入しない**
+
+そのため、`customHTMLRenderer: { hardBreak() { return [{ type: 'html', content: '<br>' }]; } }` は WYSIWYG 上の改行表示に一切効果を持たない。
+
+**根本原因工程（v1.1.0 更新判定）**: **03 - 詳細設計**（継続）  
+
+v1.3.0 での詳細設計（§4.3.1）に `customHTMLRenderer.hardBreak` を必須仕様として追加したが、この API が「WYSIWYG ProseMirror 描画には作用しない」という Toast UI Editor v3 の API 仕様を考慮せず、誤った修正方針を設計として確定させた。根本原因工程は引き続き **03 詳細設計** である。
+
+**見逃し工程（v1.1.0 更新）**:
+- **04 - 実装**: `customHTMLRenderer` の API スコープ（preview/HTML出力のみ）を検証せずに実装した
+- **05・06 - テスト**: JSDOM 制約により WYSIWYG 実描画の確認が不可能なまま
+- **07 - システムテスト**: ST-E03 Manual:Pending が Pending のままリリースタグを打った
+
+**ST-E03 Windows実機確認（2026-03-04）**:  
+v1.3.0 アプリにて以下のファイルを WYSIWYG モードで開いた場合、行末スペース2個付き行が連続する箇所が改行されずに1段落として表示されることを確認。
+
+```markdown
+## 前提条件  
+・単体評価結果について  
+　ー現在単体評価結果は社内サーバ上にある。  
+　ー関数ごとにフォルダ分けされている。  
+　－フォルダ階層の深さは一定でない。  
+　ーフォルダには単体テスト結果(html)、プリプロセッサ処理後のCソース（拡張子はi）が格納されている。
+```
+
+- **根本原因工程（確定）**: 03 - 詳細設計
+- **見逃し工程**: 04 実装 / 05 単体テスト / 06 結合テスト / 07 システムテスト
+- **発見工程**: 07 システムテスト（Windows 実機 ST-E03 Manual 確認）
+
+**証拠（v1.1.0 追加分）**:
+
+| 文書 | 該当箇所 | 内容 |
+|---|---|---|
+| `03_detailed_design.md` v1.3.0 §4.3.1 | `customHTMLRenderer.hardBreak` 仕様 | WYSIWYG に作用しない API を必須仕様として追加 |
+| `04_implementation.md` v1.3.0 §3d | 変更内容 | `customHTMLRenderer.hardBreak` 実装。API スコープ確認の記録なし |
+| `07_system_test.md` v1.4.0 ST-E03 | Auto:Pass / Manual:Pending | Windows 実機確認 Pending のまま v1.3.0 タグ打ち |
+| `bug/bugs.md` #2 | ST-E03 Windows実機確認（2026-03-04） | v1.3.0 でも WYSIWYG 改行されないことを確認 |
   詳細設計書（v1.2.0）の `preprocessMarkdown()` 仕様（§4.3.3a）において、trailing-space（行末スペース2個）の解決策として「`/ {2,}\n/g` → `'  \n'` で入力を正規化して渡す」方式が定められた。しかしこの方式は、**Toast UI Editor の `setMarkdown()` に渡す文字列中のスペースを保護することしか保証しない**。
 
   Toast UI Editor の WYSIWYG エンジン（ProseMirror ベース）が、`setMarkdown()` で受け取ったMarkdown文字列を内部でHTML DOMに変換する際、行末スペースを `<br>` としてレンダリングするかどうかは別問題である。実際、多くのWYSIWYGエディタはMarkdown→DOM変換時にProseMirror内部でtrailing-spaceを除去または無視するため、`preprocessMarkdown` で文字列を保護しても WYSIWYG 上の表示には反映されない。
@@ -59,45 +123,32 @@
   | **05 単体テスト・06 結合テスト** | JSDOM 制約で確認不能なレンダリング観点については、「未確認」として明示的にトラッキングし、代替確認手段（Playwright・Spectron・スクリーンショット差分等）の適用検討を記録すること。テスト除外理由の記録を必須とすること |
   | **07 システムテスト** | Manual:Pending のテスト項目は、リリース前に完了させることをリリース判定の条件に含めること。Pending が残る場合は「既知のリスク」として記録し、承認者の sign-off を得ること |
 
-  **技術的修正案（Bug #2 解消のための実装変更案）**:
+**技術的修正案（v1.1.0 更新版 ― Bug #2 解消のための正しい実装変更案）**:
 
-  以下のいずれかの対策を `04 実装` 工程で検討・適用すること。
+v1.3.0 の `customHTMLRenderer.hardBreak` は WYSIWYG に効果がないため破棄し、以下の修正案を 03 詳細設計工程にて再設計すること。
 
-  1. **`preprocessMarkdown` での変換強化**: `setMarkdown()` 呼び出し前に trailing-space を `<br>` に変換する。
-     ```javascript
-     function preprocessMarkdown(content) {
-         // trailing-space（2スペース以上 + 改行）を <br> タグに変換
-         return content.replace(/ {2,}(\n)/g, '<br>$1');
-     }
-     ```
-     > ⚠️ `setMarkdown()` が HTML タグを受け付けるかは要検証。WYSIWYG モードでは受け付ける可能性あり。
+| 案 | 方法 | 概要 | リスク |
+|---|------|------|--------|
+| **A（推奨）** | `preprocessMarkdown` で `  \n` → `<br>\n` に変換してから `setMarkdown()` に渡す | Toast UI Editor の WYSIWYG モードはインライン HTML を認識し `<br>` を ProseMirror `hard_break` ノードに変換する。`getMarkdown()` でのセーブ時に `hard_break` は `  \n` として復元される | `setMarkdown()` が `<br>` インライン HTML を正しく処理するかを実装工程で実機検証必須 |
+| **B** | `preprocessMarkdown` で `  \n` → `\\\n`（バックスラッシュ改行）に変換 | CommonMark の明示的ハードブレーク。Toast UI Editor がバックスラッシュ改行をサポートする場合に有効 | Toast UI Editor v3 でのバックスラッシュ改行サポート状況を要確認 |
+| **C** | `setMarkdown()` 後に `editor.setHTML(editor.getHTML())` でHTMLを再セット | HTML プレビューは `customHTMLRenderer.hardBreak` が効くため `<br>` が含まれる。それを WYSIWYG に再反映させる | 二重変換による情報欠落リスク・パフォーマンス影響あり |
 
-  2. **Toast UI Editor の customHTMLRenderer / plugins 利用**: `markdown-it` のオプション `breaks: true`（softbreak を `<br>` にする）または trailing-space 対応プラグインを活用する。
-     ```javascript
-     editorInstance = new Editor({
-         ...
-         customHTMLRenderer: {
-             softbreak: () => ({ type: 'html', content: '<br>' })
-         }
-     });
-     ```
-
-  3. **Markdown→HTML 変換を外部ライブラリで事前実施**: `marked` / `remark` 等の CommonMark 準拠パーサーで Markdown を HTML に変換し、`editor.setHTML()` に渡す。
+> ⚠️ **実装工程での実機検証必須**: どの案を採用するにしても、Windows 実機で WYSIWYG 表示の改行を目視確認してからリリース判定すること。ST-E03 Manual 確認を **リリース承認の必須条件** とすること。
 
 ---
 
 ## 3. 工程別根本原因件数集計
 
 ```
-工程別根本原因件数（解析対象：未解決不具合 1件）
+工程別根本原因件数（解析対象：未解決不具合 1件 / v1.1.0 時点）
 
 01 要件定義  | 0件 |
 02 基本設計  | 0件 |
-03 詳細設計  | ■■■■■ 1件 ← 根本原因確定
-04 実装      | 0件 |（見逃し工程に該当）
-05 単体テスト| 0件 |（見逃し工程に該当）
-06 結合テスト| 0件 |（見逃し工程に該当）
-07 ｼｽﾃﾑﾃｽﾄ  | 0件 |（見逃し工程に該当）
+03 詳細設計  | ■■■■■ 1件 ← 根本原因確定（v1.0.0・v1.1.0 共通）
+04 実装      | 0件 |（見逃し工程：誤った API を使用した修正を確認せず実装）
+05 単体テスト| 0件 |（見逃し工程：JSDOM で WYSIWYG 実描画確認不可）
+06 結合テスト| 0件 |（見逃し工程：同上）
+07 ｼｽﾃﾑﾃｽﾄ  | 0件 |（見逃し工程：ST-E03 Manual Pending のままリリース）
 ```
 
 - **最も不具合が多い工程**: 03 詳細設計（1件）
@@ -127,4 +178,4 @@
 
 ---
 
-*本レポートは 09 不具合混入工程解析エージェント により 2026-03-04 に生成。*
+*本レポートは 09 不具合混入工程解析エージェント により 2026-03-04 に生成（v1.0.0）、v1.3.0 修正失敗受けて同日 v1.1.0 に更新。*
