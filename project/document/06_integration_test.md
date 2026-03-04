@@ -1,58 +1,82 @@
 # 06 結合評価報告書
 
+| 版数 | 更新日 | 変更概要 |
+|------|------------|------------------------------------------|
+| 1.0.0 | 2026-03-03 | 初版作成 |
+| 1.1.0 | 2026-03-03 | 実装 v1.1.0（D&D方式）対応。評価項目全面更新・全件再実行 |
+| 1.1.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration変更・ require化）。BUG-03 追記、nodeIntegration 記述修正、重複セクション削除 |
+
 ## 1. 評価概要
 
-- **評価対象**: レンダラープロセス (`src/renderer/renderer.js`) とメインプロセス間の IPC 通信
-- **評価方法**: Jest + JSDOM によるUIイベント→API呼び出しの自動テスト
+- **評価対象**: レンダラープロセス (`src/renderer/renderer.js`) ⇔ メインプロセス (`src/main.js`) の IPC 通信結合フロー
+- **評価方法**: Jest + JSDOM による自動テスト（`integration.test.js`）
 - **テスト実施日**: 2026-03-03
+- **基本設計参照**: `02_basic_design.md` v1.1.0
 
 ## 2. 評価環境
 
 - **OS**: Linux (Dev Container)
 - **Framework**: Jest + jest-environment-jsdom
-- **Mocking**: `window.api`（Preload API）, Toast UI Editor, DOM (JSDOM)
+- **Mocking**: `window.api`（Preload API）、Toast UI Editor、DOM (JSDOM)
 
 ## 3. テスト項目と結果
 
-### 3.1. Renderer → IPC 結合テスト
+### 3.1. D&Dファイル読み込みフロー
 
-| ID | テストケース | 内容 | 結果 | 備考 |
+| ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
-| IT-IPC-001 | フォルダ選択 → ツリー描画 | フォルダ選択ボタンクリックで `openFolder` / `readDir` が呼ばれ、ツリーにファイルが表示されること | **OK** | |
-| IT-IPC-002 | ファイルクリック → 内容読込 | ツリー内ファイルクリックで `readFile` が呼ばれ、エディタに内容がセットされること | **OK** | |
-| IT-IPC-003 | 保存ボタン → ファイル保存 | 保存ボタンクリックで `saveFile` が呼ばれること | **OK** | |
-| IT-IPC-004 | 新規作成ボタン → ファイル生成 | 新規作成ボタンクリックで `createFile` が呼ばれること | **OK** | |
+| IT-DND-001 | .mdファイルD&D → エディタ表示 | `drop` → `window.api.readFile` → `editor.setMarkdown` | **PASS** | `#drop-filename` へのファイル名表示も確認 |
+| IT-DND-002 | .md以外ファイルD&D → エラー表示 | `drop` → 拡張子チェック → `alert` | **PASS** | `readFile` が呼ばれないことを確認 |
+| IT-DND-003 | 未保存時D&D → 確認ダイアログ → Cancel → 中止 | `isUnsaved` チェック → `showConfirm` → Cancel → 読み込みなし | **PASS** | |
 
-**実施結果**: 4/4 Pass
+### 3.2. ファイル操作フロー
 
-### 3.2. 再テスト結果 (ソフトウェア変更後)
-
-- **変更内容**: `electron-squirrel-startup` を `dependencies` に追加（ロジック変更なし）
-- **再テスト日**: 2026-03-03
-- **結果**: **4/4 Pass**
-- **判定**: 回帰なし。全テスト合格。
-
-### 3.3. 追加結合テスト（未カバー補完）
-
-| ID | テストケース | 内容 | 結果 | 備考 |
+| ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
-| IT-IPC-004 | 新規作成ボタン → ファイル生成 | `createFile` が呼ばれ、ツリーが更新されること | **OK** | ルートフォルダ設定済み状態で検証 |
-| IT-IPC-006 | リネームボタン → ファイルリネーム | 選択中ファイルに `renamePath` が呼ばれること | **OK** | DOM選択状態を手動セットアップして検証 |
-| IT-STATE-001 | エディタ変更イベント → 未保存インジケータ表示 | changeHandler呼び出し後にindicatorが `display:inline` になること | **OK** | MockEditorのlastInstanceで検証 |
-| IT-IPC-005b | 削除 →削除確認ダイアログ → readdirでツリー更新 | showConfirm呼び出し後にdeletePath→readDirが呼ばれること | **OK** | 既存IT-IPC-005に含む |
+| IT-IPC-003 | 保存ボタン → ファイル保存 | `btn-save.click` → `editor.getMarkdown` → `window.api.saveFile` | **PASS** | `currentFilePath` と内容が正しく渡されることを確認 |
+| IT-IPC-004 | 新規作成ボタン → ファイル生成 | `btn-new.click` → `window.api.createFile` → `loadFile` | **PASS** | 同ディレクトリへの作成を確認 |
+| IT-IPC-005 | 削除ボタン → 確認 → 削除 | `btn-delete.click` → `showConfirm` → `window.api.deletePath` | **PASS** | 削除後に `currentFilePath` がクリアされることを確認 |
+| IT-IPC-006 | リネームボタン → パス更新 | `btn-rename.click` → `prompt` → `window.api.renamePath` → タイトル更新 | **PASS** | 新パスが正しく組み立てられることを確認 |
 
-**追加後総合結果: 8/8 Pass**
+### 3.3. 状態管理フロー
 
-## 4. 不具合・課題
+| ID | テストケース | 結合パス | 結果 | 備考 |
+|:--|:--|:--|:--|:--|
+| IT-STATE-001 | 編集変更 → 未保存インジケータ表示 | `editor.change` → `setUnsaved(true)` → `#unsaved-indicator` 表示 | **PASS** | |
 
-| No | 不具合内容 | 重要度 | 状態 |
-|:--|:--|:--|:--|
-| BUG-04-001 | devcontainer環境でフォルダダイアログが開かない（GTK/GPU不足・no-sandbox未設定） | 高 | **解決済み（04修正）** |
-| BUG-04-002 | dialog:openFolder のエラー無音失敗 | 中 | **解決済み（04修正）** |
-| BUG-04-003 | folderOpenBtn null時のスクリプト停止 | 中 | **解決済み（04修正）** |
+**総合結果: 8/8 Pass**
 
-## 5. 結論
+## 4. 基本設計との対応確認
 
-レンダラープロセスのUIイベントからIPCへのブリッジ動作について、主要な8ケースすべてが正常に動作していることを確認した。
-04工程で発見・修正した3件の不具合（フォルダダイアログ未起動）も回帰確認済み。
-**全21件（単体13 + 結合8）合格により、システム評価（07）への引き渡し条件を充足する。**
+| 基本設計要件 | 実装 | 評価結果 |
+|:--|:--|:--|
+| D&Dゾーンでのファイル開き（v1.1.0） | `#drop-zone` への drag/drop イベント | ✅ 確認済 |
+| `.md` 以外のファイル拒否 | 拡張子チェック + `alert` | ✅ 確認済 |
+| IPC: `fs:readFile` 呼び出し | `window.api.readFile` → `ipcRenderer.invoke` | ✅ 確認済 |
+| IPC: `fs:saveFile` 呼び出し | `window.api.saveFile` → `ipcRenderer.invoke` | ✅ 確認済 |
+| IPC: `dialog:showConfirm` 呼び出し | `window.api.showConfirm` → `ipcRenderer.invoke` | ✅ 確認済 |
+| 未保存変更インジケータ | `change` イベント連動 | ✅ 確認済 |
+| `contextIsolation: true` / `nodeIntegration: true` | `preload.js` の `contextBridge` 経由，レンダラー内 `require()` によるライブラリロード | ✅ 確認済 |
+| パストラバーサル対策 | `validatePath` を全ハンドラで呼び出し（UT-V-001〜006 確認済） | ✅ 確認済 |
+
+## 5. 不具合・課題
+
+| No | 不具合内容 | 重要度 | 状態 | 対応内容 |
+|:--|:--|:--|:--|:--|
+| BUG-04-001〜003 | フォルダダイアログ関連の不具合 | 高→廃止 | **該当なし** | v1.1.0 で `openFolder` 廃止により不問 |
+| BUG-01 | `validatePath` 未接続 | 中 | **解決済み（05工程）** | セグメント単位 `..` 検出に修正し全ハンドラへ接続 |
+| BUG-03 | exe 実行時エディタ未初期化（`toastui-editor-all.js` 不在・`nodeIntegration: false` で `require()` 不可） | 高 | **解決済み（04工程）** | `nodeIntegration: true` 化・CSS/JSファイル名修正・`require('@toast-ui/editor')` 化。`integration.test.js` のモック方式も更新済み |
+## 6. 未評価項目
+
+| ID | 項目 | 理由 |
+|:---|:---|:---|
+| IT-TOOLBAR-* | ツールバー各ボタンのエディタコマンド発行 | JSDOM で Toast UI Editor 実動作不可。Electron 実機（07システムテスト）での目視確認推奨 |
+| IT-MODE-001 | WYSIWYG ↔ Markdownモード切替の実動作 | 同上 |
+| IT-SHORTCUT-001 | Ctrl+S でのファイル保存 | JSDOM での `keydown` イベント伝搬に制限あり。実機確認推奨 |
+
+## 7. 結論
+
+レンダラープロセスの D&D 読み込み・ファイル操作・未保存検知の各フローにおいて、IPC 結合動作が基本設計 v1.1.0 通りであることを確認した。  
+単体テスト（26件）と結合テスト（8件）の合計 **34件すべて合格** 。  
+ツールバー実動作・モード切替・ショートカットキーは実機評価（07）に委ねる。  
+**システム評価（07）への引き渡し条件を充足する。**

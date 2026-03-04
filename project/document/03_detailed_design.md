@@ -1,5 +1,11 @@
 # 詳細設計書
 
+| 版数 | 更新日 | 変更概要 |
+|------|------------|------------------------------------------|
+| 1.0.0 | 2026-03-03 | 初版作成（基本設計 v1.0.0 対応） |
+| 1.1.0 | 2026-03-03 | MDファイルD&D方式に変更。`dialog:openFolder`/`fs:readDir`廃止、ツリー関連実装廃止 |
+| 1.1.1 | 2026-03-04 | `nodeIntegration: true` に変更（Toast UI Editor の `require()` ロード対応。本アプリは完全ローカル動作のため許容） |
+
 ## 1. ディレクトリ構造・ファイル構成
 ```
 project/
@@ -25,15 +31,15 @@ project/
 
 ### 2.2. 関数仕様一覧
 
+> **[変更] v1.1.0**: `handleOpenFolder`・`handleReadDir` を廃止。フォルダ選択・ツリー走査機能は不要となるため。
+
 | 関数名 | 引数 | 戻り値 | 処理内容 | 異常系 |
 |:---|:---|:---|:---|:---|
-| `createWindow` | なし | `void` | `BrowserWindow` インスタンス生成、`index.html` ロード。<br> `webPreferences`: { `preload`, `contextIsolation: true`, `nodeIntegration: false` } | ロード失敗時ログ出力 |
-| `handleOpenFolder` | なし | `Promise<string\|null>` | `dialog.showOpenDialog` (properties: `openDirectory`) を実行。<br>選択パスを返す。キャンセル時はErrorではなく `null` を返す。 | |
-| `handleReadDir` | `dirPath` | `Promise<object[]>` | `fs.readdir` でエントリ取得。`isDirectory()` で種別判定。<br>戻り値: `{ name: string, isDirectory: boolean, path: string }[]`。<br>**バリデーション**: `path.normalize` で遡り (`..`) をチェックし、ルート外アクセスなら例外。 | 読み取り権限エラー、パス不在 |
-| `handleReadFile` | `filePath` | `Promise<string>` | `fs.readFile` (Buffer) → `chardet` で判定 → `iconv-lite` でUTF-8デコードして返す。<br>**バリデーション**: ルート外チェック。 | ファイル不在、読み取り権限不可 |
-| `handleSaveFile` | `filePath`, `content` | `Promise<void>` | `fs.writeFile` でUTF-8で上書き保存。<br>**バリデーション**: ルート外チェック。 | 書き込み権限エラー |
+| `createWindow` | なし | `void` | `BrowserWindow` インスタンス生成、`index.html` ロード。<br> `webPreferences`: { `preload`, `contextIsolation: true`, `nodeIntegration: true` }<br>※ローカル固定HTMLのみ読み込み・外部URLナビゲーションなしのため許容 | ロード失敗時ログ出力 |
+| `handleReadFile` | `filePath` | `Promise<string>` | `fs.readFile` (Buffer) → `chardet` で判定 → `iconv-lite` でUTF-8デコードして返す。 | ファイル不在、読み取り権限不可 |
+| `handleSaveFile` | `filePath`, `content` | `Promise<void>` | `fs.writeFile` でUTF-8で上書き保存。 | 書き込み権限エラー |
 | `handleCreateFile` | `dirPath`, `fileName` | `Promise<string>` | `path.join` でパス生成。<br>`fs.writeFile` で空文字作成。<br>成功ならフルパスを返す。 | 同名ファイル存在時エラー |
-| `handleDeletePath` | `targetPath` | `Promise<void>` | フォルダなら `fs.rm(..., {recursive: true})`、ファイルなら `fs.unlink`。 | 削除ロック時エラー |
+| `handleDeletePath` | `targetPath` | `Promise<void>` | ファイルなら `fs.unlink`。 | 削除ロック時エラー |
 | `handleRenamePath` | `oldPath`, `newPath` | `Promise<void>` | `fs.rename` を実行。 | 移動先重複エラー |
 | `handleShowConfirm`| `message` | `Promise<boolean>` | `dialog.showMessageBox` (type: question, buttons: ['OK', 'Cancel'])。<br>response === 0 を返す。 | |
 
@@ -41,8 +47,9 @@ project/
 `contextBridge.exposeInMainWorld('api', { ... })` を使用し、レンダラーへ安全なAPIを公開する。
 
 ### 3.1. 公開API (`window.api`)
-- `openFolder: () => ipcRenderer.invoke('dialog:openFolder')`
-- `readDir: (path) => ipcRenderer.invoke('fs:readDir', path)`
+
+> **[変更] v1.1.0**: `openFolder` ・ `readDir` を廃止。
+
 - `readFile: (path) => ipcRenderer.invoke('fs:readFile', path)`
 - `saveFile: (path, content) => ipcRenderer.invoke('fs:saveFile', path, content)`
 - `createFile: (dir, name) => ipcRenderer.invoke('fs:createFile', dir, name)`
@@ -54,15 +61,19 @@ project/
 HTML操作とイベントリスナーの設定を行う。
 
 ### 4.1. DOM要素ID
-- `#file-tree`: 左ペインのコンテナ
-- `#folder-open-btn`: フォルダを開くボタン
+
+> **[変更] v1.1.0**: `#file-tree`・`#folder-open-btn` を廃止。`#drop-zone` を新設。
+
+- `#drop-zone`: 左ペインのMDファイル D&D 受付ゾーン
 - `#editor-container`: 右ペインのエディタマウントポイント
 - `#toolbar-container`: 独自ツールバーのコンテナ
 - `#mode-switch`: モード切替ラジオボタン/タブ
 - `#unsaved-indicator`: 未保存状態表示
 
 ### 4.2. 変数管理
-- `currentRoot`: 現在開いているルートフォルダパス
+
+> **[変更] v1.1.0**: `currentRoot` を廃止。フォルダ管理概念なし。
+
 - `currentFilePath`: 現在編集中のファイルパス
 - `isUnsaved`: 未保存変更フラグ (boolean)
 - `editor`: Toast UI Editor インスタンス
@@ -74,14 +85,16 @@ HTML操作とイベントリスナーの設定を行う。
 - オプション: `initialEditType: 'wysiwyg'`, `previewStyle: 'vertical'`, `height: '100%'`
 - イベント登録: `change` イベントで `setUnsaved(true)` を呼ぶ。
 
-#### 4.3.2. ファイルツリー制御 (`renderTree`, `onFileClick`)
-- `root` パスを受け取り `window.api.readDir` をコール。
-- 再帰的呼び出しについては、初回は1階層のみ、フォルダクリック時に下位階層を遅延読み込み（または一括読み込み）する。
-- **UI**: `<ul>`, `<li>` 要素を動的生成。
-- ファイルクリック時:
-    - `isUnsaved` なら `confirm` ダイアログ表示。
-    - キャンセルなら遷移中断。
-    - OKなら `loadFile(path)` を実行。
+#### 4.3.2. D&Dファイル自動読み込み (`handleFileDrop`)
+
+> **[変更] v1.1.0**: `renderTree`/`onFileClick`/`window.api.readDir` を廃止。MDファイルを直接D&Dして開く。
+
+- `#drop-zone` に `dragover` イベントを登録（`e.preventDefault()`）。
+- `#drop-zone` に `drop` イベントを登録。
+  - `e.dataTransfer.files[0]` でドロップされたファイルを取得。
+  - 拡張子が `.md` でない場合は`alert`でエラー表示。
+  - `isUnsaved` なら確認ダイアログを表示。OKなら `loadFile(file.path)` を実行。
+- Electron環境では `file.path` にローカルファイルシステムの絶対パスが格納される。
 
 #### 4.3.3. ファイル読み込み (`loadFile`)
 - `window.api.readFile(path)` を実行。
@@ -123,8 +136,8 @@ HTML操作とイベントリスナーの設定を行う。
     - `files`: ["src/**/*", "package.json"]
 
 ## 7. テスト観点対応
-- **F01 (ツリー)**: 階層構造が正しく表示されるか。ルート外ファイルが見えないか。
+- **D01 (D&D読込)**: MDファイルをD&Dした際エディタに表示されるか。非`.md`ファイルをD&Dした際エラー表示されるか。
 - **F04 (新規)**: 同名ファイル時のエラー、特殊文字ファイル名の扱い。
 - **E01 (読込)**: Shift-JISファイルが化けずに開けるか。
 - **E02 (編集)**: 太字、リスト等が正常にMarkdownに変換されるか。
-- **E06 (未保存)**: 編集中に `*` が出るか。閉じる時に警告が出るか
+- **E06 (未保存)**: 編集中に `*` が出るか。閉じる時に警告が出るか。

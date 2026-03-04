@@ -1,17 +1,24 @@
-件名: docs: README.md を全面改訂（プロジェクト概要・使い方・技術スタック等を追加）
+件名: fix: v1.1.1 — exe起動時エディタ未初期化バグ修正（BUG-03）、D&DによるUIに変更、全ドキュメント更新
 
-概要: 1行のみだった README.md を全面的に書き直し、アプリの特長・動作環境・使い方・技術スタック・フォルダ構成・開発者向け手順・開発プロセス・ライセンスを追加した。
+概要: v1.1.0で導入したD&D方式UIにおいて、exeビルド後にエディタが真っ白になる問題（BUG-03）を修正した。
+原因はCSSファイル名の誤り・不要なスクリプトタグの残存・nodeIntegration設定の不整合の3点。
+合わせてテストスイートのモックパターンを修正し、全工程ドキュメントをv1.1.1に更新した。
 
 変更点:
-- `README.md`: タイトル誤字修正（`mdFileWritter` → `mdFileWriter`）
-- `README.md`: アプリ概要・特長セクションを追加（WYSIWYG、ファイルツリー、ローカル動作 等）
-- `README.md`: 動作環境テーブルを追加（OS・配布形式・外部依存）
-- `README.md`: 使い方セクションを追加（基本フロー5ステップ、HOWTOUSE.md へのリンク）
-- `README.md`: 技術スタックテーブルを追加（Electron・Toast UI Editor・chardet・electron-builder・Jest）
-- `README.md`: フォルダ構成ツリーを追加
-- `README.md`: 開発者向けセクションを追加（セットアップ・実行・テスト・Windows向けビルド手順）
-- `README.md`: 開発プロセステーブルを追加（01〜08工程と成果物へのリンク）
-- `README.md`: MITライセンス記載を追加
+- `project/src/renderer/index.html`: CSS参照を `toastui-editor.min.css` → `toastui-editor.css` に修正（BUG-03）
+- `project/src/renderer/index.html`: 存在しない `toastui-editor-all.js` のscriptタグを削除（BUG-03）
+- `project/src/main.js`: `nodeIntegration: false` → `nodeIntegration: true` に変更（BUG-03）
+- `project/src/renderer/renderer.js`: `toastui.Editor` グローバル参照 → `require('@toast-ui/editor')` に変更（BUG-03）
+- `project/test/integration.test.js`: モックパターンを `global.toastui` → `jest.mock('@toast-ui/editor', factory, {virtual: true})` に変更
+- `project/package.json`: バージョン `1.0.1` → `1.1.1`
+- `HOWTOUSE.md`: UIをフォルダツリー方式からD&Dゾーン方式に全面改訂（v1.1.1対応）
+- `project/document/03_detailed_design.md`: `nodeIntegration: true` の設計根拠を追記（v1.1.1）
+- `project/document/04_implementation.md`: BUG-03修正内容を追記（v1.1.1）
+- `project/document/05_unit_test.md`: jest.mockパターン変更・26/26 PASS を記録（v1.2.1）
+- `project/document/06_integration_test.md`: BUG-03追加・34テスト確認（v1.1.1）
+- `project/document/07_system_test.md`: RC v1.1.1評価・BUG-03収束確認（v1.1.1）
+- `project/document/08_release.md`: リリース日・バージョン・フェーズ結果を更新（v1.1.1）
 
 確認結果:
-- 変更対象: README.md のみ（ソースコード・テスト・設定ファイルへの影響なし）
+- テスト結果: 26/26 PASS（jest）
+- 変更対象: ソース3ファイル・テスト1ファイル・設定1ファイル・ドキュメント6ファイル・HOWTOUSE.md

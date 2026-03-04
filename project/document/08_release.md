@@ -5,8 +5,8 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.0.1 |
-| リリース日 | 2026-03-03 |
+| バージョン | v1.1.1 |
+| リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
 | 配布形式 | NSISインストーラ (.exe) / ポータブル (.exe) |
@@ -20,9 +20,9 @@
 | 01 要件定義 | ✅ 完了 | |
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
-| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動） |
-| 05 単体評価 | ✅ 13/13 Pass | 追加テスト（deletePath/renamePath/cancel系）補完済み (2026-03-03) |
-| 06 結合評価 | ✅ 8/8 Pass | 追加テスト（新規作成/リネーム/未保存インジケータ）補完済み (2026-03-03) |
+| 04 実装 | ✅ 完了 | BUG-04-001～003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化） |
+| 05 単体評価 | ✅ 26/26 Pass | BUG-01（validatePath）対応済み。jest.mock方式もv1.1.1対応済み |
+| 06 結合評価 | ✅ 8/8 Pass | 34件全件合格 |
 | 07 システム評価 | ✅ 条件付き合格 | UIの最終確認はWindows実機で行うこと |
 | **総合判定** | **✅ リリース可** | |
 
@@ -72,6 +72,28 @@
 | ビルドコマンド | `npm run build` (`electron-builder --win`) |
 | アップロード先 | GitHub Releases |
 | リリースノート参照 | `project/document/08_release.md` |
+
+---
+
+## 5-0. リリースノート (v1.1.1)
+
+### 新機能
+- **D&DによるファイルオープンUI**（v1.1.0〜）: 左ペインをフォルダツリーからD&Dゾーンに変更。エクスプローラーからMDファイルをドロップして開く方式に刷新。
+- ツールバーに **💾保存 / 📄新規作成 / 🗑️削除 / ✏️リネーム** ボタンを統合
+
+### バグ修正
+- **BUG-03**: exeビルド後にエディタが真っ白になる問題を修正
+  1. `index.html` のCSS参照 `toastui-editor.min.css` → `toastui-editor.css`
+  2. `index.html` の不要スクリプトタグ（`toastui-editor-all.js`）を削除
+  3. `main.js` の `nodeIntegration: false` → `true` に変更
+  4. `renderer.js` のエディタ初期化を `toastui.Editor` → `require('@toast-ui/editor')` に変更
+
+### テスト修正
+- `integration.test.js`: モックパターンを `global.toastui` → `jest.mock('@toast-ui/editor', factory, {virtual: true})` に変更。26/26 PASS 確認済み。
+
+### ドキュメント
+- `HOWTOUSE.md`: D&DゾーンUIに全面改訂
+- `03_detailed_design.md` ～ `07_system_test.md`: 全工程をv1.1.1対応に更新
 
 ---
 
@@ -125,8 +147,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.0.1
-   git push origin v1.0.1
+   git tag v1.1.1
+   git push origin v1.1.1
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。

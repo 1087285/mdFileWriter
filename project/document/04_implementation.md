@@ -1,79 +1,111 @@
 # 04 実装記録
 
+| 版数 | 更新日 | 変更概要 |
+|------|------------|------------------------------------------|
+| 1.0.0 | 2026-03-03 | 初版作成 |
+| 1.1.0 | 2026-03-03 | 詳細設計 v1.1.0 対応（D&D方式への変更） |
+| 1.1.1 | 2026-03-03 | exe実行時エディタ未初期化バグ修正（nodeIntegration・require化・CSSファイル名） |
+
 ## 1. 実装概要
-詳細設計書に基づき、メインプロセス、レンダラープロセス、UIの実装を行った。
+詳細設計書（v1.1.0）に基づき、メインプロセス、レンダラープロセス、UIの実装を行った。  
+v1.1.0 では「フォルダ選択＋ファイルツリー方式」を廃止し、**MDファイルD&D方式**へ変更した。
 
 ## 2. 実装詳細
 
 ### 2.1. メインプロセス (src/main.js)
-- **IPCハンドラの実装**: , , , , , , ,  を実装済み。
-- **セキュリティ対策**:  でパストラバーサル（）を簡易チェックするように実装。
-- **文字コード対応**:  と  を用いて読み込み時の自動判定とUTF-8変換を実装。
+- **[削除] v1.1.0**: `dialog:openFolder` ハンドラを廃止。
+- **[削除] v1.1.0**: `fs:readDir` ハンドラを廃止。
+- **[維持] IPCハンドラ**: `fs:readFile`, `fs:saveFile`, `fs:createFile`, `fs:deletePath`, `fs:renamePath`, `dialog:showConfirm` を実装。
+- **セキュリティ対策**: `validatePath` でパストラバーサル（`..`）を簡易チェック。
+- **文字コード対応**: `chardet` と `iconv-lite` を用いて読み込み時の自動判定とUTF-8変換を実装。
 
 ### 2.2. プリロードスクリプト (src/preload.js)
--  を介して、レンダラープロセスに必要なAPIのみを公開。
+- **[削除] v1.1.0**: `openFolder`, `readDir` を廃止。
+- `contextBridge.exposeInMainWorld` を介して、6つのAPIのみをレンダラーに公開: `readFile`, `saveFile`, `createFile`, `deletePath`, `renamePath`, `showConfirm`。
 
 ### 2.3. レンダラープロセス (src/renderer/index.html, renderer.js, styles.css)
-- **UI構成**: 左右ペイン（ファイルツリー、エディタ）、カスタムツールバーを実装。
-- **エディタ**: Toast UI Editor 3.x を採用。
-- **ツールバー**: カスタムボタン (属性) を配置し、 で太字・リスト等の書式適用を実装。
-- **ファイルツリー**: 再帰的読み込み構造を実装（クリック展開）。選択状態のスタイル適用。
-- **ファイル操作**:
-    - **新規作成**: ルートフォルダ直下にタイムスタンプ付きファイルを作成する簡易実装 ()。
-    - **削除**: 選択中ファイルの削除（確認ダイアログ付き）。
-    - **リネーム**: 選択中ファイルのリネーム（ ダイアログ使用）。
-- **未保存検知**: 変更監視によるインジケータ表示、ファイル切り替え時の確認ダイアログを実装。
+- **[変更] v1.1.0 UI構成**: 左ペインを `#drop-zone`（D&Dゾーン）に置き換え。`#file-tree`・`#folder-open-btn`・`#toolbar-left` を廃止。
+- **[変更] v1.1.0 変数**: `currentRoot` を廃止。`currentFilePath` のみで管理。
+- **[削除] v1.1.0**: `buildTreeItem()`・`renderTree()` 関数を廃止。
+- **[新規] v1.1.0 D&Dファイル読み込み** (`setupDropZone`):
+  - `dragover`/`dragleave`/`drop` イベントを登録。
+  - `.md` 以外のファイルをドロップした場合は `alert` でエラー表示。
+  - `isUnsaved` が true の場合は確認ダイアログを表示し、OKなら `loadFile(file.path)` を実行。
+- **エディタ**: Toast UI Editor 3.x を用いた WYSIWYGエディタ。
+- **ツールバー**: `data-cmd` 属性ボタンから `editor.exec()` で書式適用。
+- **ファイル操作**（現在開いているファイルに対して実行）:
+  - **新規作成**: `currentFilePath` と同ディレクトリにタイムスタンプ付きファイルを作成。
+  - **削除**: 現在のファイルを削除（確認ダイアログ付き）。
+  - **リネーム**: 現在のファイルをリネーム（`prompt` ダイアログ使用）。
+- **未保存検知**: `change` イベント監視によるインジケータ表示、ファイル読み込み時の確認ダイアログを実装。
+- **Ctrl+S**: グローバルショートカットで `saveFile()` を呼び出す。
+- **モード切替**: `#mode-switch` セレクトで WYSIWYGモード / Markdownソースモードを切替。
 
 ### 2.4. パッケージとビルド (package.json)
-- 依存関係 (, , , ) を追加。
--  の設定を追加し、Windows向け（nsis, portable）ビルドが可能になるよう構成。
+- 依存関係: `electron`, `chardet`, `iconv-lite`, `@toast-ui/editor`。
+- `electron-builder` の設定: `appId: com.example.mdfilewriter`, Windows向け（nsis, portable）ビルド構成済み。
 
 ## 3. 詳細設計との差分
-- **ツールバー実装**: 標準のToast UI Editorツールバーを非表示にし、要件に合わせたカスタムボタンを実装した。
-- **新規作成ロジック**: ファイル名入力ダイアログ（モーダル）の作成工数を削減するため、一時的に現在時刻ベースの自動命名＋リネーム推奨の運用とした。
-- **リネームUI**: 簡易的に  を使用して実装した。
+- **v1.1.0 D&D方式採用**: `dialog:openFolder`/`fs:readDir`/ツリー関連を廃止し、左ペインをD&DゾーンUIに変更した。これは詳細設計 v1.1.0 の変更に完全対応した実装。
+- **新規作成ロジック v1.1.0**: ツリー廃止に伴い、`currentRoot` の代わりに `currentFilePath` のディレクトリを使用するよう変更。
+- **削除・リネームロジック v1.1.0**: ツリー選択状態（`.selected`）から現在開いているファイル（`currentFilePath`）を操作する形式に変更。
+
+## 3a. バグ修正記録（v1.1.1）
+
+### 問題
+exe を実行すると Toast UI Editor が初期化されず、エディタ領域が空白のまま表示。D&D も機能しない状態だった。
+
+### 根本原因（3点）
+
+| # | ファイル | 問題内容 |
+|---|---|---|
+| 1 | `src/renderer/index.html` | CSS 参照が `toastui-editor.min.css`（存在しない）→ スタイル未適用 |
+| 2 | `src/renderer/index.html` | JS 参照が `toastui-editor-all.js`（存在しない）→ `toastui` グローバル未定義 |
+| 3 | `src/renderer/renderer.js` | `const Editor = toastui.Editor` → `toastui` が undefined のため ReferenceError 発生・エディタ未初期化 |
+
+`toastui-editor.js` は UMD 形式だが、ブラウザグローバルモードで prosemirror 依存部が `root[undefined]` になっており `nodeIntegration: false` 環境では独立ロードが不可能な構造だった。
+
+### 修正内容
+
+| ファイル | 修正前 | 修正後 |
+|---|---|---|
+| `src/renderer/index.html` | `toastui-editor.min.css` | `toastui-editor.css` |
+| `src/renderer/index.html` | `<script src="toastui-editor-all.js">` タグあり | 削除（renderer.js の require() で代替） |
+| `src/renderer/renderer.js` | `const Editor = toastui.Editor` | `const Editor = require('@toast-ui/editor')` |
+| `src/main.js` | `nodeIntegration: false` | `nodeIntegration: true` |
+
+`nodeIntegration: true` により renderer.js で Node.js `require()` が使用可能になり、UMD の CJS ブランチが実行され prosemirror 依存が正常にロードされる。
 
 ## 4. 既知の問題・制約
-- **ツリー更新**: ファイル操作後のツリー更新は  を呼び出すことで全体リロードしている。フォルダ階層が深い場合、展開状態がリセットされる可能性がある。
-- **エラーハンドリング**: ファイルシステムエラー時は  で通知する簡易実装となっている。
+- **リネームUI**: Electronで `prompt()` の動作が制限される場合があるため、カスタムモーダルへの改修が望ましい。
+- **新規作成の場所**: ファイルを開いていない状態では新規作成できない設計になっている（D&D後のみ操作可能）。
+- **エラーハンドリング**: ファイルシステムエラー時は `alert()` で通知する簡易実装となっている。
 
-## 5. 次のステップ
-- 単体テストの実施。
-- ビルドテスト (
-> md-file-writer@1.0.0 build
-> electron-builder --win
+## 5. テスト対象一覧
+### メインプロセス（main.js）
+| 関数名 | テスト観点 |
+|---|---|
+| `handleReadFile` | 正常読込・Shift-JIS判定・ファイル不在エラー |
+| `handleSaveFile` | 正常保存・書き込み権限エラー |
+| `handleCreateFile` | 正常作成・同名ファイル存在時エラー |
+| `handleDeletePath` | ファイル削除・削除失敗エラー |
+| `handleRenamePath` | 正常リネーム・移動先重複エラー |
+| `handleShowConfirm` | OK/Cancelの戻り値 |
 
-  • electron-builder  version=24.13.3 os=6.8.0-1044-azure
-  • loaded configuration  file=package.json ("build" field)
-  • author is missed in the package.json  appPackageFile=/workspaces/mdFileWriter/project/package.json
-  • packaging       platform=win32 arch=x64 electron=28.3.3 appOutDir=dist/win-unpacked
-  • downloading     url=https://github.com/electron/electron/releases/download/v28.3.3/electron-v28.3.3-win32-x64.zip size=108 MB parts=4
-  • downloaded      url=https://github.com/electron/electron/releases/download/v28.3.3/electron-v28.3.3-win32-x64.zip duration=854ms
-  • Cannot detect repository by .git/config. Please specify "repository" in the package.json (https://docs.npmjs.com/files/package.json#repository).
-Please see https://electron.build/configuration/publish
-  • default Electron icon is used  reason=application icon is not set
-  • downloading     url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z size=5.6 MB parts=1
-  • downloaded      url=https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z duration=1.078s
-  ⨯ wine is required, please see https://electron.build/multi-platform-build#linux  
-  ⨯ /workspaces/mdFileWriter/project/node_modules/app-builder-bin/linux/x64/app-builder process failed ERR_ELECTRON_BUILDER_CANNOT_EXECUTE
-Exit code:
-1  failedTask=build stackTrace=Error: /workspaces/mdFileWriter/project/node_modules/app-builder-bin/linux/x64/app-builder process failed ERR_ELECTRON_BUILDER_CANNOT_EXECUTE
-Exit code:
-1
-    at ChildProcess.<anonymous> (/workspaces/mdFileWriter/project/node_modules/builder-util/src/util.ts:252:14)
-    at Object.onceWrapper (node:events:623:26)
-    at ChildProcess.emit (node:events:508:28)
-    at maybeClose (node:internal/child_process:1101:16)
-    at Process.ChildProcess._handle.onexit (node:internal/child_process:305:5)
-From previous event:
-    at processImmediate (node:internal/timers:504:21)
-From previous event:
-    at WinPackager.signApp (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/winPackager.ts:384:27)
-    at WinPackager.doSignAfterPack (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/platformPackager.ts:336:32)
-    at WinPackager.doPack (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/platformPackager.ts:321:7)
-    at WinPackager.pack (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/platformPackager.ts:140:5)
-    at Packager.doBuild (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/packager.ts:445:9)
-    at executeFinally (/workspaces/mdFileWriter/project/node_modules/builder-util/src/promise.ts:12:14)
-    at Packager._build (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/packager.ts:379:31)
-    at Packager.build (/workspaces/mdFileWriter/project/node_modules/app-builder-lib/src/packager.ts:340:12)
-    at executeFinally (/workspaces/mdFileWriter/project/node_modules/builder-util/src/promise.ts:12:14)) の実施。
+### レンダラープロセス（renderer.js）
+| 機能 | テスト観点 |
+|---|---|
+| D&D読込 | .mdドロップ→エディタ表示、非.mdドロップ→エラー |
+| ファイル保存 | Ctrl+S・保存ボタンでファイル保存 |
+| 未保存検知 | 編集後の`*`表示、ファイル切替時の確認 |
+| ツールバー | 各書式ボタンがToast UIコマンドを発行 |
+| モード切替 | WYSIWYGとMarkdownモードの切り替え |
+
+## 6. ビルド手順
+```
+cd project
+npm install
+npm run build   # electron-builder (Windows環境で実行)
+```
+- Linux環境での Windows ビルドは `wine` が必要。Linuxネイティブビルド: `npm run build -- --linux`
+

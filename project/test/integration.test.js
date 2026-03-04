@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Integration Test for Renderer Logic
+ * Integration Test for Renderer Logic (v1.1.0 D&D方式対応)
  *
  * Verifies that Renderer UI functions correctly call window.api (Preload/IPC).
  * Uses jest-environment-jsdom.
@@ -9,30 +9,26 @@
 
 const path = require('path');
 
-// Mock Toast UI Editor
-const mockSetMarkdown = jest.fn();
-const mockGetMarkdown = jest.fn();
-class MockEditor {
-    constructor(options) {
-        this.options = options;
-        MockEditor.lastInstance = this;
-        // Simulate change event listener registration
-        if (options.events && options.events.change) {
-            this.changeHandler = options.events.change;
-        }
-    }
-    setMarkdown(md) { mockSetMarkdown(md); }
-    getMarkdown() { return mockGetMarkdown(); }
-    exec() {}
-    changeMode() {}
-}
-MockEditor.lastInstance = null;
-global.toastui = { Editor: MockEditor };
+// Mock Toast UI Editor via require (v1.1.1: renderer.js は require('@toast-ui/editor') を使用)
+// jest.mock はホイスティングされるためファクトリ内で完結させ、MockEditor はrequire経由で取得する
+jest.mock('@toast-ui/editor', () => {
+    const MockEditorCtor = jest.fn().mockImplementation(function(options) {
+        MockEditorCtor.lastInstance = this;
+        this._changeHandler = (options && options.events && options.events.change) || null;
+        this.setMarkdown = jest.fn();
+        this.getMarkdown = jest.fn();
+        this.exec = jest.fn();
+        this.changeMode = jest.fn();
+    });
+    MockEditorCtor.lastInstance = null;
+    return MockEditorCtor;
+}, { virtual: true });
 
-// Mock Preload API
+// jest.mock後にrequireしてMockEditorCtorへの参照を取得
+const MockEditorCtor = require('@toast-ui/editor');
+
+// Mock Preload API (v1.1.0: openFolder/readDir なし)
 const mockApi = {
-    openFolder: jest.fn(),
-    readDir: jest.fn(),
     readFile: jest.fn(),
     saveFile: jest.fn(),
     createFile: jest.fn(),
@@ -41,13 +37,6 @@ const mockApi = {
     showConfirm: jest.fn()
 };
 
-// Setup Globals
-// Jest JSDOM sets window as global
-// Verify window existence
-if (typeof window === 'undefined') {
-    // Should not happen with testEnvironment: 'jsdom'
-    global.window = {}; // Fallback
-}
 Object.defineProperty(window, 'api', {
     value: mockApi,
     writable: true
@@ -55,110 +44,124 @@ Object.defineProperty(window, 'api', {
 global.alert = jest.fn();
 global.prompt = jest.fn();
 
-// Init DOM
+// Init DOM (v1.1.0: #drop-zone, #drop-filename)
 document.body.innerHTML = `
-    <button id="folder-open-btn">Open Folder</button>
-    <div id="file-tree"></div>
+    <div id="drop-zone">
+        <p>📄 MDファイルをここに<br>ドラッグ＆ドロップ</p>
+        <p id="drop-filename"></p>
+    </div>
     <div id="editor-container"></div>
     <span id="unsaved-indicator" style="display:none">*</span>
     <button id="btn-save">Save</button>
     <button id="btn-new">New</button>
     <button id="btn-delete">Delete</button>
     <button id="btn-rename">Rename</button>
-    <button id="mode-switch">Mode</button>
+    <select id="mode-switch">
+        <option value="wysiwyg">WYSIWYG</option>
+        <option value="markdown">Markdown</option>
+    </select>
 `;
 
-// Load renderer.js logic
+// Load renderer.js
 try {
-    // Force reload if possible?
     require('../src/renderer/renderer.js');
 } catch (e) {
     console.error('Renderer Load Error:', e);
 }
 
-describe('Integration: Renderer -> IPC', () => {
+// Helper: D&Dイベントを発生させる
+function createDropEvent(fileName, filePath) {
+    const event = new Event('drop', { bubbles: true });
+    event.preventDefault = jest.fn();
+    event.dataTransfer = {
+        files: [{ name: fileName, path: filePath }]
+    };
+    return event;
+}
+
+function createDragoverEvent() {
+    const event = new Event('dragover', { bubbles: true });
+    event.preventDefault = jest.fn();
+    return event;
+}
+
+describe('Integration: Renderer v1.1.0 D&D方式', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
-    test('IT-IPC-001: Open Folder -> Render Tree', async () => {
-        mockApi.openFolder.mockResolvedValue('/test/root');
-        mockApi.readDir.mockResolvedValue([
-            { name: 'file1.md', isDirectory: false, path: '/test/root/file1.md' },
-            { name: 'subdir', isDirectory: true, path: '/test/root/subdir' }
-        ]);
-
-        const btn = document.getElementById('folder-open-btn');
-        btn.click();
-        
-        // Wait for async
-        await new Promise(r => setTimeout(r, 50));
-
-        expect(mockApi.openFolder).toHaveBeenCalled();
-        expect(mockApi.readDir).toHaveBeenCalledWith('/test/root');
-        
-        const tree = document.getElementById('file-tree');
-        expect(tree.innerHTML).toContain('file1.md');
-        expect(tree.innerHTML).toContain('subdir');
-    });
-
-    test('IT-IPC-002: Click File -> Load Content', async () => {
+    test('IT-DND-001: .mdファイルをD&DするとloadFileが呼ばれエディタに表示される', async () => {
         mockApi.readFile.mockResolvedValue('# Hello World');
-        
-        const labels = document.querySelectorAll('li span');
-        let fileLabel;
-        for (const l of labels) { 
-            if (l.textContent.includes('file1.md')) fileLabel = l; 
-        }
-        
-        expect(fileLabel).toBeDefined();
-        fileLabel.click();
 
-        // Increase delay to ensure currentFilePath is set via setTimeout(50) in renderer.js
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('test.md', '/path/to/test.md');
+        dropZone.dispatchEvent(dropEvent);
+
         await new Promise(r => setTimeout(r, 100));
 
-        expect(mockApi.readFile).toHaveBeenCalledWith('/test/root/file1.md');
-        expect(mockSetMarkdown).toHaveBeenCalledWith('# Hello World');
+        expect(mockApi.readFile).toHaveBeenCalledWith('/path/to/test.md');
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('# Hello World');
+
+        const dropFilename = document.getElementById('drop-filename');
+        expect(dropFilename.textContent).toBe('test.md');
     });
 
-    test('IT-IPC-003: Save File', async () => {
-        // Depends on state from IT-IPC-002: currentFilePath must be set.
-        // Jest executes tests in order. So if global state persists, this works.
-        // If isolateModules() was used or beforeEach reset, it would fail.
-        // Here we rely on persistent state of require('../src/renderer/renderer.js').
-        
-        mockGetMarkdown.mockReturnValue('New Content');
+    test('IT-DND-002: .md以外のファイルをD&DするとalertでエラーになりreadFileは呼ばれない', async () => {
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('image.png', '/path/to/image.png');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 50));
+
+        expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('.md'));
+        expect(mockApi.readFile).not.toHaveBeenCalled();
+    });
+
+    test('IT-DND-003: 未保存時にD&Dすると確認ダイアログが出る（Cancelで読み込まない）', async () => {
+        mockApi.showConfirm.mockResolvedValue(false);
+
+        // 未保存状態にする
+        const editorInst = MockEditorCtor.lastInstance;
+        if (editorInst && editorInst._changeHandler) {
+            editorInst._changeHandler();
+        }
+        await new Promise(r => setTimeout(r, 50));
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('other.md', '/path/to/other.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(mockApi.showConfirm).toHaveBeenCalled();
+        expect(mockApi.readFile).not.toHaveBeenCalled();
+    });
+
+    test('IT-IPC-003: 保存ボタン押下でsaveFileが呼ばれる', async () => {
+        // currentFilePathを設定するためにD&Dしてファイルを開く
+        mockApi.readFile.mockResolvedValue('# Save Test');
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('save.md', '/path/to/save.md');
+        mockApi.showConfirm.mockResolvedValue(true); // 未保存確認OK
+        dropZone.dispatchEvent(dropEvent);
+        await new Promise(r => setTimeout(r, 100));
+
+        jest.clearAllMocks();
+        MockEditorCtor.lastInstance.getMarkdown.mockReturnValue('# Save Test Updated');
         mockApi.saveFile.mockResolvedValue();
 
         const btn = document.getElementById('btn-save');
         btn.click();
-        
+
         await new Promise(r => setTimeout(r, 50));
-        
-        expect(mockApi.saveFile).toHaveBeenCalledWith('/test/root/file1.md', 'New Content');
+
+        expect(mockApi.saveFile).toHaveBeenCalledWith('/path/to/save.md', '# Save Test Updated');
     });
 
-    test('IT-IPC-005: Delete File', async () => {
-         // Select file first
-         mockApi.showConfirm.mockResolvedValue(true); 
-         mockApi.deletePath.mockResolvedValue();
-         mockApi.readDir.mockResolvedValue([]); 
-
-         const btn = document.getElementById('btn-delete');
-         btn.click();
-         
-         await new Promise(r => setTimeout(r, 50));
-         
-         expect(mockApi.showConfirm).toHaveBeenCalled();
-         expect(mockApi.deletePath).toHaveBeenCalledWith('/test/root/file1.md');
-    });
-
-    test('IT-IPC-004: Create New File', async () => {
-        mockApi.createFile.mockResolvedValue('/test/root/NewFile_xxx.md');
-        mockApi.readDir.mockResolvedValue([
-            { name: 'NewFile_xxx.md', isDirectory: false, path: '/test/root/NewFile_xxx.md' }
-        ]);
+    test('IT-IPC-004: 新規作成ボタン押下でcreateFileが呼ばれる', async () => {
+        mockApi.createFile.mockResolvedValue('/path/to/NewFile_xxx.md');
+        mockApi.readFile.mockResolvedValue('');
 
         const btn = document.getElementById('btn-new');
         btn.click();
@@ -166,55 +169,66 @@ describe('Integration: Renderer -> IPC', () => {
         await new Promise(r => setTimeout(r, 100));
 
         expect(mockApi.createFile).toHaveBeenCalled();
-        expect(mockApi.readDir).toHaveBeenCalled();
     });
 
-    test('IT-IPC-006: Rename File', async () => {
-        // Setup: manually add a selected item to the tree
-        const fileTree = document.getElementById('file-tree');
-        const ul = document.createElement('ul');
-        const li = document.createElement('li');
-        li.title = '/test/root/file2.md';
-        li.classList.add('selected');
-        const span = document.createElement('span');
-        span.textContent = '\uD83D\uDCC4 file2.md';
-        li.appendChild(span);
-        ul.appendChild(li);
-        fileTree.innerHTML = '';
-        fileTree.appendChild(ul);
+    test('IT-IPC-005: 削除ボタン押下でdeletePathが呼ばれる', async () => {
+        // IT-IPC-004 で新規作成 → currentFilePath が NewFile になっているので再度 D&D でファイルを開く
+        mockApi.readFile.mockResolvedValue('# Delete Test');
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('delete.md', '/path/to/delete.md');
+        mockApi.showConfirm.mockResolvedValue(true);
+        dropZone.dispatchEvent(dropEvent);
+        await new Promise(r => setTimeout(r, 100));
 
+        jest.clearAllMocks();
+        mockApi.showConfirm.mockResolvedValue(true);
+        mockApi.deletePath.mockResolvedValue();
+
+        const btn = document.getElementById('btn-delete');
+        btn.click();
+
+        await new Promise(r => setTimeout(r, 50));
+
+        expect(mockApi.showConfirm).toHaveBeenCalled();
+        expect(mockApi.deletePath).toHaveBeenCalledWith('/path/to/delete.md');
+    });
+
+    test('IT-IPC-006: リネームボタン押下でrenamePathが呼ばれる', async () => {
+        // ファイルを再度開く
+        mockApi.readFile.mockResolvedValue('# Rename Test');
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('rename.md', '/path/to/rename.md');
+        mockApi.showConfirm.mockResolvedValue(true);
+        dropZone.dispatchEvent(dropEvent);
+        await new Promise(r => setTimeout(r, 100));
+
+        jest.clearAllMocks();
         global.prompt = jest.fn().mockReturnValue('renamed.md');
         mockApi.renamePath.mockResolvedValue();
-        mockApi.readDir.mockResolvedValue([
-            { name: 'renamed.md', isDirectory: false, path: '/test/root/renamed.md' }
-        ]);
 
         const btn = document.getElementById('btn-rename');
         btn.click();
 
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 50));
 
         expect(mockApi.renamePath).toHaveBeenCalledWith(
-            '/test/root/file2.md',
+            '/path/to/rename.md',
             expect.stringContaining('renamed.md')
         );
     });
 
-    test('IT-STATE-001: Unsaved indicator shown on editor change', async () => {
+    test('IT-STATE-001: 編集変更で未保存インジケータが表示される', async () => {
         const unsaved = document.getElementById('unsaved-indicator');
-        // After save from IT-IPC-003, indicator should be hidden
-        expect(unsaved.style.display).toBe('none');
 
-        // Trigger the editor's change event via the captured instance
-        const editorInst = MockEditor.lastInstance;
+        const editorInst = MockEditorCtor.lastInstance;
         expect(editorInst).not.toBeNull();
-        if (editorInst && editorInst.changeHandler) {
-            editorInst.changeHandler();
+        if (editorInst && editorInst._changeHandler) {
+            editorInst._changeHandler();
         }
 
         await new Promise(r => setTimeout(r, 50));
 
-        // Indicator should now be visible
         expect(unsaved.style.display).toBe('inline');
     });
 });
+

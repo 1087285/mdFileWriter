@@ -76,30 +76,16 @@ describe('Main Process Unit Tests', () => {
   });
 
   test('IPC Handler Registration', () => {
-    expect(handlers['dialog:openFolder']).toBeDefined();
-    expect(handlers['fs:readDir']).toBeDefined();
+    // v1.1.0: openFolder/readDir は廃止
+    expect(handlers['dialog:openFolder']).toBeUndefined();
+    expect(handlers['fs:readDir']).toBeUndefined();
+    // 残り6ハンドラが登録されていること
     expect(handlers['fs:readFile']).toBeDefined();
     expect(handlers['fs:saveFile']).toBeDefined();
     expect(handlers['fs:createFile']).toBeDefined();
     expect(handlers['fs:deletePath']).toBeDefined();
-  });
-
-  test('fs:readDir should return file list', async () => {
-    const mockEntries = [
-      { name: 'file1.txt', isDirectory: () => false },
-      { name: 'dir1', isDirectory: () => true }
-    ];
-    fs.promises.readdir.mockResolvedValue(mockEntries);
-
-    if (handlers['fs:readDir']) {
-        const result = await handlers['fs:readDir']({}, '/test/dir');
-        
-        expect(fs.promises.readdir).toHaveBeenCalledWith('/test/dir', { withFileTypes: true });
-        expect(result).toEqual([
-        { name: 'file1.txt', isDirectory: false, path: path.join('/test/dir', 'file1.txt') },
-        { name: 'dir1', isDirectory: true, path: path.join('/test/dir', 'dir1') }
-        ]);
-    }
+    expect(handlers['fs:renamePath']).toBeDefined();
+    expect(handlers['dialog:showConfirm']).toBeDefined();
   });
 
   test('fs:readFile should return content', async () => {
@@ -147,19 +133,21 @@ describe('Main Process Unit Tests', () => {
     }
   });
   
-  test('dialog:openFolder should return file path', async () => {
-      dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/selected/path'] });
-      if (handlers['dialog:openFolder']) {
-          const result = await handlers['dialog:openFolder']();
-          expect(result).toBe('/selected/path');
+  test('dialog:showConfirm should return true on OK', async () => {
+      const mockShowMessageBox = require('electron').dialog.showMessageBox;
+      if (!mockShowMessageBox) return;
+      require('electron').dialog.showMessageBox = jest.fn().mockResolvedValue({ response: 0 });
+      if (handlers['dialog:showConfirm']) {
+          const result = await handlers['dialog:showConfirm']({}, '続けますか？');
+          expect(result).toBe(true);
       }
   });
 
-  test('dialog:openFolder should return null when canceled', async () => {
-      dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
-      if (handlers['dialog:openFolder']) {
-          const result = await handlers['dialog:openFolder']();
-          expect(result).toBeNull();
+  test('dialog:showConfirm should return false on Cancel', async () => {
+      require('electron').dialog.showMessageBox = jest.fn().mockResolvedValue({ response: 1 });
+      if (handlers['dialog:showConfirm']) {
+          const result = await handlers['dialog:showConfirm']({}, '続けますか？');
+          expect(result).toBe(false);
       }
   });
 
@@ -206,21 +194,48 @@ describe('Main Process Unit Tests', () => {
       expect(handlers['fs:renamePath']).toBeDefined();
       expect(handlers['dialog:showConfirm']).toBeDefined();
   });
-  
-  test('path validation (indirect)', async () => {
-      // Since validatePath is not exported, we can test validation via fs:readDir, etc. if implemented.
-      // But currently handlers might not create full validation logic testable via mocks easily 
-      // without triggering real fs access unless validatePath is faulty.
-      // However, create_file uses path.join, which handles .. somewhat but validatePath adds security.
-      // Since we can't access validatePath directly, we skip explicit unit test for it here 
-      // unless we mock path.normalize or check specific inputs that would fail.
-      // E.g. fs:readDir with '..'
-      
-      // Let's assume handlers use it. 
-      // If fs:readDir calls validatePath and it returns false, what happens?
-      // main.js code uses it?
-      // "if (!validatePath(...)) return;" check isn't in main.js snippet I saw earlier? 
-      // Let's check main.js again.
+
+  // --- validatePath (BUG-01 fix) ---
+  test('fs:readFile should throw on path traversal', async () => {
+    if (handlers['fs:readFile']) {
+      await expect(handlers['fs:readFile']({}, '/safe/../etc/passwd'))
+        .rejects.toThrow('path traversal detected');
+    }
+  });
+
+  test('fs:saveFile should throw on path traversal', async () => {
+    if (handlers['fs:saveFile']) {
+      await expect(handlers['fs:saveFile']({}, '/safe/../secret.md', 'x'))
+        .rejects.toThrow('path traversal detected');
+    }
+  });
+
+  test('fs:createFile should throw on path traversal in dirPath', async () => {
+    if (handlers['fs:createFile']) {
+      await expect(handlers['fs:createFile']({}, '/safe/../etc', 'evil.md'))
+        .rejects.toThrow('path traversal detected');
+    }
+  });
+
+  test('fs:deletePath should throw on path traversal', async () => {
+    if (handlers['fs:deletePath']) {
+      await expect(handlers['fs:deletePath']({}, '/safe/../etc'))
+        .rejects.toThrow('path traversal detected');
+    }
+  });
+
+  test('fs:renamePath should throw on path traversal in oldPath', async () => {
+    if (handlers['fs:renamePath']) {
+      await expect(handlers['fs:renamePath']({}, '/safe/../etc/old.md', '/safe/new.md'))
+        .rejects.toThrow('path traversal detected');
+    }
+  });
+
+  test('fs:renamePath should throw on path traversal in newPath', async () => {
+    if (handlers['fs:renamePath']) {
+      await expect(handlers['fs:renamePath']({}, '/safe/old.md', '/safe/../etc/new.md'))
+        .rejects.toThrow('path traversal detected');
+    }
   });
 
 });

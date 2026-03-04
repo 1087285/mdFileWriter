@@ -1,81 +1,81 @@
 # 05 単体評価報告書
 
+| 版数 | 更新日 | 変更概要 |
+|------|------------|------------------------------------------|
+| 1.0.0 | 2026-03-03 | 初版作成 |
+| 1.1.0 | 2026-03-03 | 実装 v1.1.0（D&D方式）対応。テストケース更新・全件再実行 |
+| 1.2.0 | 2026-03-03 | BUG-01 修正対応。validatePath 接続・テスト追加・全件再実行 |
+| 1.2.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration/require化）。integration.test.js のモック方式を `global.toastui` → `jest.mock('@toast-ui/editor')` に変更。26/26 PASS 再確認 |
+
 ## 1. 評価概要
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)
-- **評価方法**: 自動テストフレームワーク (`jest`) による関数単位の検証。レンダラープロセスは構造上、統合テストまたは手動確認を主とする。
+- **評価方法**: Jest による自動テスト（unit: `main.test.js`、integration(renderer): `integration.test.js`）
 
 ## 2. 評価環境
 - **OS**: Linux (Dev Container)
-- **Framework**: Jest (`npm test`)
-- **Mocking**: Electron API (`ipcMain`, `dialog`, `BrowserWindow`), File System (`fs`), `chardet`, `iconv-lite`
+- **Framework**: Jest (`npx jest`)
+- **Mocking**: Electron API (`ipcMain`, `dialog`, `BrowserWindow`), File System (`fs`), `chardet`, `iconv-lite`, Toast UI Editor
 
 ## 3. テスト項目と結果
 
-### 3.1. メインプロセス (Logic / IPC Handlers)
+### 3.1. メインプロセス (main.test.js) — 12/12 PASS
 
 | ID | 機能 | テストケース | 結果 | 備考 |
 |:---|:---|:---|:---|:---|
-| UT-M-001 | パス検証 | ルート外のパスへのアクセスを拒否する (validatePath相当) | - | ※現実装では使用されていないためスキップ (課題事項) |
-| UT-M-002 | フォルダ選択 | ダイアログがパスを返すこと | OK | |
-| UT-M-003 | ディレクトリ読込| 指定パスのファイル一覧が返ること | OK | |
-| UT-M-004 | ファイル読込 | 指定ファイルの内容が返ること (UTF-8) | OK | |
-| UT-M-005 | ファイル読込 | 存在しないファイルでエラーになること | OK | |
-| UT-M-006 | ファイル保存 | 内容が書き込まれること | OK | |
-| UT-M-007 | 新規作成 | 指定名で空ファイルが作成されること | OK | |
-| UT-M-008 | 新規作成 | 同名ファイルが存在する場合エラーになること | OK | |
-| UT-M-009 | 削除 | ファイルが削除されること | - | ※`fs:deletePath`の実装はあるがテストケース未作成 (基本ロジックは他と同様) |
-| UT-M-010 | リネーム | 名前が変更されること | - | ※`fs:renamePath`の実装はあるがテストケース未作成 |
+| UT-M-001 | IPC登録確認 | `dialog:openFolder`/`fs:readDir` が未登録であること（v1.1.0廃止確認） | **PASS** | |
+| UT-M-002 | IPC登録確認 | `fs:readFile`,`saveFile`,`createFile`,`deletePath`,`renamePath`,`showConfirm` が登録されていること | **PASS** | |
+| UT-M-003 | ファイル読込 | 指定ファイルの内容が返ること（UTF-8 / chardet経由） | **PASS** | |
+| UT-M-004 | ファイル保存 | 内容が UTF-8 で書き込まれること | **PASS** | |
+| UT-M-005 | 新規作成 | 指定名で空ファイルが作成されフルパスが返ること | **PASS** | |
+| UT-M-006 | 新規作成 | 同名ファイル存在時にエラーが投げられること | **PASS** | |
+| UT-M-007 | 確認ダイアログ | OK（response=0）で true が返ること | **PASS** | |
+| UT-M-008 | 確認ダイアログ | Cancel（response=1）で false が返ること | **PASS** | |
+| UT-M-009 | 削除 | ファイルが `fs.unlink` で削除されること | **PASS** | |
+| UT-M-010 | 削除 | ディレクトリが `fs.rm（recursive）` で削除されること | **PASS** | |
+| UT-M-011 | リネーム | `fs.rename` が呼ばれること | **PASS** | |
+| UT-M-012 | リネーム | 移動先が存在する場合にエラーが投げられること | **PASS** | |
+| UT-V-001 | パストラバーサル防御 | `fs:readFile` に `..` を含むパスを渡すとエラーになること | **PASS** | BUG-01 fix |
+| UT-V-002 | パストラバーサル防御 | `fs:saveFile` に `..` を含むパスを渡すとエラーになること | **PASS** | BUG-01 fix |
+| UT-V-003 | パストラバーサル防御 | `fs:createFile` の dirPath に `..` を含むとエラーになること | **PASS** | BUG-01 fix |
+| UT-V-004 | パストラバーサル防御 | `fs:deletePath` に `..` を含むパスを渡すとエラーになること | **PASS** | BUG-01 fix |
+| UT-V-005 | パストラバーサル防御 | `fs:renamePath` の oldPath に `..` を含むとエラーになること | **PASS** | BUG-01 fix |
+| UT-V-006 | パストラバーサル防御 | `fs:renamePath` の newPath に `..` を含むとエラーになること | **PASS** | BUG-01 fix |
 
-**実施結果**: 8ケース実施、8ケース合格 (パス検証、削除、リネームの一部は未実施だが、主要なRead/Write/Createは正常動作を確認)
-
-### 3.2. レンダラープロセス (UI Logic)
-※レンダラープロセスはDOM/Editor依存度が高いため、単体テストではなく動作確認にて評価する方針とする。
+### 3.2. レンダラープロセス (integration.test.js) — 8/8 PASS
 
 | ID | 機能 | テストケース | 結果 | 備考 |
 |:---|:---|:---|:---|:---|
-| UT-R-001 | ベース名取得 | パスからファイル名が抽出できること (getBasename) | - | 目視確認済 (実装内容: `split(/[\\/]/).pop()`) |
-| UT-R-002 | 未保存フラグ | フラグ変更時にタイトルが更新されること (setUnsaved) | - | 動作未確認 (統合テストにて実施予定) |
+| IT-DND-001 | D&Dファイル読込 | .mdファイルをD&DするとreadFileが呼ばれエディタに表示される | **PASS** | `#drop-filename`にファイル名表示も確認 |
+| IT-DND-002 | D&Dファイル読込 | .md以外のファイルをD&DするとalertでエラーになりreadFileは呼ばれない | **PASS** | |
+| IT-DND-003 | D&D未保存確認 | 未保存時にD&Dすると確認ダイアログが出てCancelで中止できる | **PASS** | |
+| IT-IPC-003 | ファイル保存 | 保存ボタン押下で saveFile が currentFilePath・内容で呼ばれる | **PASS** | |
+| IT-IPC-004 | 新規作成 | 新規作成ボタン押下で createFile が呼ばれる | **PASS** | |
+| IT-IPC-005 | 削除 | 削除ボタン押下で確認後 deletePath が呼ばれる | **PASS** | |
+| IT-IPC-006 | リネーム | リネームボタン押下で renamePath が正しいパスで呼ばれる | **PASS** | |
+| IT-STATE-001 | 未保存検知 | 編集変更で未保存インジケータが表示される | **PASS** | |
+
+**総合結果**: **26/26 Pass**
 
 ## 4. 不具合・課題
 
 | No | 不具合内容 | 重要度 | 状態 | 対応内容 |
 |:--|:--|:--|:--|:--|
-| BUG-01 | `validatePath` 関数がIPCハンドラから呼び出されていない / 実装が空 | 中 | 残存（許容） | セキュリティ要件の補完として記録。現バージョンでは `..` チェックを `validatePath` に記述しているが呼び出し未接続。v1.1.0での対応とする。 |
-| BUG-02 | `electron-squirrel-startup` が `dependencies` に未登録で実行ファイルに同梱されなかった | 高 | **解決済み** | `npm install electron-squirrel-startup --save` で `dependencies` に追加。`v1.0.0` タグを付け直してリリース済み。 |
+| BUG-01 | `validatePath` 関数がIPCハンドラから呼び出されていない / 実装が空 | 中 | **解決済み** | セグメント単位の `..` 検査に修正し、全5ハンドラへ接続。UT-V-001〜006 で検証。 |
+| BUG-02 | `electron-squirrel-startup` が `dependencies` に未登録 | 高 | **解決済み** | `npm install electron-squirrel-startup --save` で対応済み。 |
+| BUG-03 | exe実行時エディタ未初期化（`toastui-editor-all.js` 存在せず・`nodeIntegration: false` で `require()` 不可） | 高 | **解決済み** | `nodeIntegration: true` 化・CSS/JSファイル名修正・`require('@toast-ui/editor')` に変更（実装 v1.1.1）。integration.test.js のモック方式も `global.toastui` → `jest.mock('@toast-ui/editor')` に更新。 |
 
-## 5. 再テスト結果 (ソフトウェア変更後)
+## 5. 未評価項目
 
-- **変更内容**: `electron-squirrel-startup` を `dependencies` に追加（`package.json` のみ変更、ロジック変更なし）
-- **再テスト日**: 2026-03-03
-- **結果**: **12/12 Pass** (Unit 8 + Integration 4)
-- **判定**: 回帰なし。全テスト合格。
+| ID | 項目 | 理由 |
+|:---|:---|:---|
+| UT-R-* | ツールバー各ボタン・Ctrl+S・モード切替 | JSDOM 環境でToast UI Editor の実際のコマンド発行確認が困難。E2E（Spectron等）での評価推奨 |
 
-## 5-2. 追加テスト結果（04修正後・未カバー補完）
+## 6. 結合評価への引き継ぎ事項
+- 主要IPCハンドラ（readFile/saveFile/createFile/deletePath/renamePath/showConfirm）はすべて単体テスト PASS。
+- D&D読込・保存・削除・リネームの基本フローはレンダラーテストで確認済み。
+- `validatePath` による `..` パストラバーサル防御を全5ハンドラに実装・テスト済み（BUG-01 解決）。
+- Windows環境でのビルドには wine が必要（Linux環境での制約）。
 
-- **変更内容**: `dialog:openFolder` 不具合修正（--no-sandbox追加・try/catch・nullガード）、および `fs:deletePath` / `fs:renamePath` / `dialog:openFolder` キャンセル系の単体テスト追加
-- **再テスト日**: 2026-03-03
-- **テスト追加数**: +5件（main.test.js）, +4件（integration.test.js）
+- **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)
+- **評価方法**: 自動テストフレームワーク (`jest`) による関数単位の検証。レンダラープロセスは構造上、統合テストまたは手動確認を主とする。
 
-| 追加テストID | 評価内容 | 結果 |
-|---|---|---|
-| UT-M-009 | dialog:openFolder — キャンセル時 null 返却 | ✅ PASS |
-| UT-M-010 | fs:deletePath — ファイル削除 | ✅ PASS |
-| UT-M-011 | fs:deletePath — ディレクトリ再帰削除 | ✅ PASS |
-| UT-M-012 | fs:renamePath — 正常リネーム | ✅ PASS |
-| UT-M-013 | fs:renamePath — 宛先既存時エラー | ✅ PASS |
-| IT-IPC-004 | 新規作成ボタン → createFile 呼び出し | ✅ PASS |
-| IT-IPC-006 | リネームボタン → renamePath 呼び出し | ✅ PASS |
-| IT-STATE-001 | エディタ変更 → 未保存インジケータ表示 | ✅ PASS |
-| UT-M-002b | IPCハンドラ登録（renamePath/showConfirm） | ✅ PASS |
-
-**総合結果: 21/21 Pass**
-
-追加不具合:
-- BUG-04-001〜003（フォルダダイアログ不具合）: 04修正済み・回帰なし
-
-## 6. 結論
-メインプロセスの主要なファイル操作ロジックは正常に機能していることを単体テストで確認した。
-BUG-02（`electron-squirrel-startup` 欠落）は修正済みであり、Windows実機での起動エラーも解消されることを確認（GitHub Actions `windows-latest` ビルド成功）。
-BUG-04-001〜003（フォルダダイアログ不起動）は04修正フェーズで解消済み。
-未評価項目（validatePath直接テスト、キーボードショートカット）は許容済みとして記録。
-**全21件合格により、結合評価（06）への引き渡し条件を充足する。**

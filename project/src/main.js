@@ -15,51 +15,20 @@ let mainWindow;
 // --- Helper Functions ---
 
 function validatePath(targetPath) {
-  if (!targetPath) return false;
-  const normalized = path.normalize(targetPath);
-  if (normalized.includes('..')) {
-      // Basic protection against traversal
+  if (!targetPath) throw new Error('Invalid path: empty');
+  // path.normalize は .. を解消するため、正規化前のセグメントで検査する
+  const segments = targetPath.split(/[/\\]/);
+  if (segments.includes('..')) {
+    throw new Error('Invalid path: path traversal detected');
   }
-  return true; 
 }
 
 // --- IPC Handlers ---
 
-// F01: Dialog - Open Folder
-ipcMain.handle('dialog:openFolder', async () => {
-  try {
-    const win = mainWindow || BrowserWindow.getFocusedWindow();
-    const result = await dialog.showOpenDialog(win, {
-      properties: ['openDirectory']
-    });
-    if (result.canceled) {
-      return null;
-    }
-    return result.filePaths[0];
-  } catch (error) {
-    console.error('dialog:openFolder error:', error);
-    throw error;
-  }
-});
-
-// F02: File System - Read Directory
-ipcMain.handle('fs:readDir', async (event, dirPath) => {
-  try {
-    const entries = await fsPromises.readdir(dirPath, { withFileTypes: true });
-    return entries.map(entry => ({
-      name: entry.name,
-      isDirectory: entry.isDirectory(),
-      path: path.join(dirPath, entry.name)
-    }));
-  } catch (error) {
-    console.error('fs:readDir error:', error);
-    throw error;
-  }
-});
-
 // E01: File System - Read File
 ipcMain.handle('fs:readFile', async (event, filePath) => {
   try {
+    validatePath(filePath);
     const buffer = await fsPromises.readFile(filePath);
     const detected = chardet.detect(buffer);
     const encoding = detected || 'utf-8';
@@ -74,6 +43,7 @@ ipcMain.handle('fs:readFile', async (event, filePath) => {
 // E03: File System - Save File (UTF-8)
 ipcMain.handle('fs:saveFile', async (event, filePath, content) => {
   try {
+    validatePath(filePath);
     await fsPromises.writeFile(filePath, content, 'utf-8');
   } catch (error) {
     console.error('fs:saveFile error:', error);
@@ -84,7 +54,9 @@ ipcMain.handle('fs:saveFile', async (event, filePath, content) => {
 // F04: File System - Create File
 ipcMain.handle('fs:createFile', async (event, dirPath, fileName) => {
   try {
+    validatePath(dirPath);
     const filePath = path.join(dirPath, fileName);
+    validatePath(filePath);
     try {
       await fsPromises.access(filePath);
       throw new Error('File already exists');
@@ -102,6 +74,7 @@ ipcMain.handle('fs:createFile', async (event, dirPath, fileName) => {
 // F05: File System - Delete Path
 ipcMain.handle('fs:deletePath', async (event, targetPath) => {
   try {
+    validatePath(targetPath);
     const stats = await fsPromises.stat(targetPath);
     if (stats.isDirectory()) {
       await fsPromises.rm(targetPath, { recursive: true, force: true });
@@ -117,6 +90,8 @@ ipcMain.handle('fs:deletePath', async (event, targetPath) => {
 // F06: File System - Rename Path
 ipcMain.handle('fs:renamePath', async (event, oldPath, newPath) => {
   try {
+     validatePath(oldPath);
+     validatePath(newPath);
      if (fs.existsSync(newPath)) {
          throw new Error('Destination already exists');
      }
@@ -148,7 +123,7 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: true
     },
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));

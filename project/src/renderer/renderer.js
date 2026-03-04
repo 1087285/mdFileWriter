@@ -1,17 +1,16 @@
 // src/renderer/renderer.js
 
-// Import Toast UI Editor
-const Editor = toastui.Editor;
+// Import Toast UI Editor via Node.js require (nodeIntegration: true)
+const Editor = require('@toast-ui/editor');
 
 // Variables
 let editorInstance;
-let currentRoot = null;
 let currentFilePath = null;
 let isUnsaved = false;
 
 // DOM Elements
-const folderOpenBtn = document.getElementById('folder-open-btn');
-const fileTree = document.getElementById('file-tree');
+const dropZone = document.getElementById('drop-zone');
+const dropFilename = document.getElementById('drop-filename');
 const editorContainer = document.getElementById('editor-container');
 const unsavedIndicator = document.getElementById('unsaved-indicator');
 const modeSwitch = document.getElementById('mode-switch');
@@ -52,88 +51,33 @@ function setUnsaved(status) {
 }
 
 /**
- * Tree Building
+ * D&D File Open
  */
-async function buildTreeItem(entry) {
-    const li = document.createElement('li');
-    li.title = entry.path;
-    li.style.cursor = 'pointer';
-    
-    // Icon
-    const label = document.createElement('span');
-    label.textContent = (entry.isDirectory ? '📁 ' : '📄 ') + entry.name;
-    li.appendChild(label); // Allow selecting folder too?
+function setupDropZone() {
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
 
-    // Mark for selection logic
-    label.onclick = async (e) => {
-        e.stopPropagation();
-        
-        // Selection state
-        document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
-        li.classList.add('selected');
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
 
-        if (entry.isDirectory) {
-            // Toggle Expand
-            const ul = li.querySelector('ul');
-            if (ul) {
-                ul.style.display = ul.style.display === 'none' ? 'block' : 'none';
-                if (ul.style.display === 'block' && ul.dataset.loaded !== 'true') {
-                    ul.dataset.loaded = 'true';
-                    ul.textContent = 'Loading...';
-                    try {
-                        const children = await window.api.readDir(entry.path);
-                        children.sort((a, b) => {
-                             if (a.isDirectory === b.isDirectory) return a.name.localeCompare(b.name);
-                             return a.isDirectory ? -1 : 1;
-                        });
-                        ul.innerHTML = '';
-                        for (const child of children) {
-                            ul.appendChild(await buildTreeItem(child));
-                        }
-                    } catch (err) {
-                        ul.textContent = 'Error: ' + err.message;
-                    }
-                }
-            }
-        } else {
-            // File Open
-            if (isUnsaved) {
-                const ok = await window.api.showConfirm('未保存の変更があります。破棄して開きますか？');
-                if (!ok) return;
-            }
-            loadFile(entry.path);
+    dropZone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (!file) return;
+        if (!file.name.endsWith('.md')) {
+            alert('MDファイル（.md）のみ開けます。');
+            return;
         }
-    };
-
-    if (entry.isDirectory) {
-        li.classList.add('folder');
-        const ul = document.createElement('ul');
-        ul.style.display = 'none';
-        li.appendChild(ul);
-    }
-
-    return li;
-}
-
-async function renderTree(dirPath) {
-    fileTree.innerHTML = 'Loading...';
-    try {
-        const entries = await window.api.readDir(dirPath);
-        entries.sort((a, b) => {
-             if (a.isDirectory === b.isDirectory) return a.name.localeCompare(b.name);
-             return a.isDirectory ? -1 : 1;
-        });
-
-        const ul = document.createElement('ul');
-        ul.className = 'tree';
-        for (const entry of entries) {
-            ul.appendChild(await buildTreeItem(entry));
+        if (isUnsaved) {
+            const ok = await window.api.showConfirm('未保存の変更があります。破棄して開きますか？');
+            if (!ok) return;
         }
-        fileTree.innerHTML = '';
-        fileTree.appendChild(ul);
-    } catch (err) {
-        fileTree.innerHTML = 'Error: ' + err.message;
-    }
+        loadFile(file.path);
+    });
 }
 
 /**
@@ -146,6 +90,7 @@ async function loadFile(filePath) {
         // Reset unsaved after loading (setMarkdown might trigger change)
         setTimeout(() => {
             currentFilePath = filePath;
+            if (dropFilename) dropFilename.textContent = getBasename(filePath);
             setUnsaved(false);
         }, 50);
     } catch (err) {
@@ -155,11 +100,7 @@ async function loadFile(filePath) {
 
 async function saveFile() {
     if (!currentFilePath) {
-        // Implement "Save As" or "New File" logic if needed, but for now alert
-        if (currentRoot) {
-            // Suggest creating new file?
-            alert('既存のファイルを選択するか、新規作成してください。');
-        }
+        alert('ファイルが開かれていません。MDファイルをドロップして開いてください。');
         return;
     }
     try {
@@ -172,66 +113,36 @@ async function saveFile() {
 }
 
 async function createNewFile() {
-    if (!currentRoot) {
-        alert('フォルダを開いてください。');
+    if (!currentFilePath) {
+        alert('先にMDファイルをドロップして開いてください。同じフォルダに新規作成します。');
         return;
     }
-    // Simple prompt for now (or modal dialog)
-    // Using simple prompt (not available in Electron? Renderer can use prompt?)
-    // Electron's window.prompt is restricted. We need a custom dialog or IPC.
-    // Let's use a simple approach: "Untitled.md" or ask user.
-    // Since we don't have prompt dialog implemented in main process yet, 
-    // we can try prompt() in renderer (might work depending on setting) or just name it "NewFile_timestamp.md".
-    // Or ask calling main process to show input dialog? `dialog` doesn't support prompt input.
-    // We will use a JS prompt if available, fallback to default name.
-    
-    // Note: window.prompt() might be disabled in Electron unless `enableRemoteModule` or similar.
-    // Let's assume we create "NewFile.md" and let user rename it.
-    let name = 'NewFile.md';
-    
-    // Find a unique name
-    // Just try create. Logic in main handles collision? No, it throws.
-    // We need user input.
-    // Let's create a minimal custom modal in HTML later?
-    // For now: Try "NewFile.md", if exists "NewFile_1.md"...
-    
-    // Actually, let's use a hack: create file with time
+    // 現在のファイルと同じフォルダに作成する
+    const separator = currentFilePath.includes('\\') ? '\\' : '/';
+    const dirPath = currentFilePath.split(separator).slice(0, -1).join(separator);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    name = `NewFile_${timestamp}.md`;
-    
-    // Where to create? In current selected folder or root?
-    // Let's use currentRoot for simplicity or try to find selected folder from UI tree.
-    // Finding selected folder from DOM is tricky without state.
-    // Use currentRoot.
-    
+    const name = `NewFile_${timestamp}.md`;
     try {
-       const newPath = await window.api.createFile(currentRoot, name);
-       await renderTree(currentRoot); // Refresh
-       loadFile(newPath);
+        const newPath = await window.api.createFile(dirPath, name);
+        loadFile(newPath);
     } catch(err) {
-       alert('New File Error: ' + err.message);
+        alert('New File Error: ' + err.message);
     }
 }
 
 async function deleteSelected() {
-    const selected = document.querySelector('.selected');
-    if (!selected) {
-        alert('削除するファイル/フォルダを選択してください。');
+    if (!currentFilePath) {
+        alert('削除するファイルが開かれていません。');
         return;
     }
-    const path = selected.title; // we stored path in title
-    
-    const confirm = await window.api.showConfirm(`本当に削除しますか？\n${path}`);
-    if (confirm) {
+    const confirmed = await window.api.showConfirm(`本当に削除しますか？\n${currentFilePath}`);
+    if (confirmed) {
         try {
-            await window.api.deletePath(path);
-            if (currentFilePath === path) {
-                currentFilePath = null;
-                editorInstance.setMarkdown('');
-                setUnsaved(false);
-            }
-            // Refresh tree
-            await renderTree(currentRoot);
+            await window.api.deletePath(currentFilePath);
+            currentFilePath = null;
+            editorInstance.setMarkdown('');
+            if (dropFilename) dropFilename.textContent = '';
+            setUnsaved(false);
         } catch(err) {
             alert('Delete Error: ' + err.message);
         }
@@ -239,17 +150,11 @@ async function deleteSelected() {
 }
 
 async function renameSelected() {
-    const selected = document.querySelector('.selected');
-    if (!selected) {
-        alert('変更するファイル/フォルダを選択してください。');
+    if (!currentFilePath) {
+        alert('名前変更するファイルが開かれていません。');
         return;
     }
-    const oldPath = selected.title;
-    const oldName = getBasename(oldPath);
-    
-    // For rename, we really need text input.
-    // Since prompt() is unsure, let's use a custom overlay in HTML or just reuse logic.
-    // Let's try simple prompt() - if it fails (returns null/undefined or throws), we catch.
+    const oldName = getBasename(currentFilePath);
     let newName = null;
     try {
         newName = prompt('新しい名前を入力してください:', oldName);
@@ -257,29 +162,17 @@ async function renameSelected() {
         alert('入力ダイアログを表示できません。');
         return;
     }
-    
     if (!newName || newName === oldName) return;
-    
-    // Construct new path
-    // Need parent dir.
-    // Assuming separator is platform specific, but here in renderer we might receive mixed.
-    // Let's rely on string manipulation for now OR better, pass dir and name to main?
-    // But `renamePath` takes full `newPath`.
-    // Let's extract dir from `oldPath`.
-    // Simple approach: replace last segment
-    const separator = oldPath.includes('\\') ? '\\' : '/';
-    const parts = oldPath.split(separator);
+    const separator = currentFilePath.includes('\\') ? '\\' : '/';
+    const parts = currentFilePath.split(separator);
     parts.pop();
     const dir = parts.join(separator);
     const newPath = dir + separator + newName;
-    
     try {
-        await window.api.renamePath(oldPath, newPath);
-         if (currentFilePath === oldPath) {
-             currentFilePath = newPath;
-             document.title = getBasename(newPath) + ' - MdFileWriter';
-         }
-         await renderTree(currentRoot);
+        await window.api.renamePath(currentFilePath, newPath);
+        currentFilePath = newPath;
+        if (dropFilename) dropFilename.textContent = getBasename(newPath);
+        document.title = getBasename(newPath) + ' - MdFileWriter';
     } catch(err) {
         alert('Rename Error: ' + err.message);
     }
@@ -289,23 +182,7 @@ async function renameSelected() {
 /**
  * Event Listeners
  */
-if (folderOpenBtn) {
-    folderOpenBtn.addEventListener('click', async () => {
-        try {
-            const path = await window.api.openFolder();
-            if (path) {
-                currentRoot = path;
-                renderTree(path);
-            }
-        } catch (err) {
-            console.error('openFolder error:', err);
-            alert('フォルダを開けませんでした: ' + err.message);
-        }
-    });
-} else {
-    console.error('folder-open-btn が見つかりません');
-}
-
+setupDropZone();
 btnSave.addEventListener('click', saveFile);
 
 // New Listeners for File Operations
@@ -356,3 +233,5 @@ document.addEventListener('keydown', (e) => {
 });
 
 initEditor();
+// dropZone を初期化
+if (dropFilename) dropFilename.textContent = '';
