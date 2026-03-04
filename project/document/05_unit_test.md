@@ -6,6 +6,7 @@
 | 1.1.0 | 2026-03-03 | 実装 v1.1.0（D&D方式）対応。テストケース更新・全件再実行 |
 | 1.2.0 | 2026-03-03 | BUG-01 修正対応。validatePath 接続・テスト追加・全件再実行 |
 | 1.2.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration/require化）。integration.test.js のモック方式を `global.toastui` → `jest.mock('@toast-ui/editor')` に変更。26/26 PASS 再確認 |
+| 1.3.0 | 2026-03-04 | 実装 v1.1.2 対応（contextIsolation: false・preload.js 直接代入）。26/26 PASS 再確認 |
 
 ## 1. 評価概要
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)
@@ -63,6 +64,7 @@
 | BUG-01 | `validatePath` 関数がIPCハンドラから呼び出されていない / 実装が空 | 中 | **解決済み** | セグメント単位の `..` 検査に修正し、全5ハンドラへ接続。UT-V-001〜006 で検証。 |
 | BUG-02 | `electron-squirrel-startup` が `dependencies` に未登録 | 高 | **解決済み** | `npm install electron-squirrel-startup --save` で対応済み。 |
 | BUG-03 | exe実行時エディタ未初期化（`toastui-editor-all.js` 存在せず・`nodeIntegration: false` で `require()` 不可） | 高 | **解決済み** | `nodeIntegration: true` 化・CSS/JSファイル名修正・`require('@toast-ui/editor')` に変更（実装 v1.1.1）。integration.test.js のモック方式も `global.toastui` → `jest.mock('@toast-ui/editor')` に更新。 |
+| BUG-04 | MDファイルD&D時に禁止マークが表示されドロップ不可（`contextIsolation: true` + `nodeIntegration: true` の競合により renderer.js 起動時クラッシュ） | 高 | **解決済み** | `contextIsolation: false` に変更、preload.js の `contextBridge.exposeInMainWorld` を `window.api = {...}` 直接代入に変更（実装 v1.1.2）。26/26 PASS 再確認（2026-03-04）。 |
 
 ## 5. 未評価項目
 
@@ -74,6 +76,8 @@
 - 主要IPCハンドラ（readFile/saveFile/createFile/deletePath/renamePath/showConfirm）はすべて単体テスト PASS。
 - D&D読込・保存・削除・リネームの基本フローはレンダラーテストで確認済み。
 - `validatePath` による `..` パストラバーサル防御を全5ハンドラに実装・テスト済み（BUG-01 解決）。
+- `contextIsolation: false` / `nodeIntegration: true` による Toast UI Editor の `require()` ロードが正常動作（BUG-03/04 解決）。
+- preload.js の `window.api` 直接代入方式が単体テストおよびrendererテストで確認済み（BUG-04 解決）。
 - Windows環境でのビルドには wine が必要（Linux環境での制約）。
 
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)

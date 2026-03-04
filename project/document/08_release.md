@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.1.1 |
+| バージョン | v1.1.2 |
 | リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -20,8 +20,8 @@
 | 01 要件定義 | ✅ 完了 | |
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
-| 04 実装 | ✅ 完了 | BUG-04-001～003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化） |
-| 05 単体評価 | ✅ 26/26 Pass | BUG-01（validatePath）対応済み。jest.mock方式もv1.1.1対応済み |
+| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク） |
+| 05 単体評価 | ✅ 26/26 Pass | BUG-01（validatePath）対応済み。jest.mock方式もv1.1.1対応済み。v1.1.2実装対応で全26/26 PASS再確認済み |
 | 06 結合評価 | ✅ 8/8 Pass | 34件全件合格 |
 | 07 システム評価 | ✅ 条件付き合格 | UIの最終確認はWindows実機で行うこと |
 | **総合判定** | **✅ リリース可** | |
@@ -38,8 +38,8 @@
 | UI (HTML/CSS/JS) | `project/src/renderer/` |
 | ビルド設定 | `project/package.json` (electron-builder) |
 | CI/CDワークフロー | `.github/workflows/build-release.yml` |
-| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.0.0.exe` (GitHub Actionsで生成) |
-| ポータブル実行ファイル | `project/dist/MdFileWriter 1.0.0.exe` (GitHub Actionsで生成) |
+| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.1.2.exe` (GitHub Actionsで生成) |
+| ポータブル実行ファイル | `project/dist/MdFileWriter 1.1.2.exe` (GitHub Actionsで生成) |
 | HOWTOUSEドキュメント | `HOWTOUSE.md` |
 | リリースノート | 本ドキュメント |
 
@@ -75,7 +75,25 @@
 
 ---
 
-## 5-0. リリースノート (v1.1.1)
+## 5-0. リリースノート (v1.1.2)
+
+### バグ修正
+- **BUG-04**: MDファイルD&D時に禁止マークが出てドロップできない問題を修正
+  1. `main.js` の `contextIsolation: true` → `false` に変更
+  2. `preload.js` の `contextBridge.exposeInMainWorld` を廃止し、`window.api = {...}` 直接代入に変更
+  - **原因**: `contextIsolation: true` + `nodeIntegration: true` の競合により renderer.js 起動時にクラッシュ → `setupDropZone()` 未実行 → `dragover` リスナ未登録 となり、OSがドロップ不可と判断し禁止マーク表示
+  - 本アプリは完全ローカル動作・外部URLナビゲーションなしのためセキュリティ上許容
+
+### テスト
+- 単体テスト（26/26 PASS）・結合テスト（8/8 PASS）再確認済み
+
+### ドキュメント
+- `HOWTOUSE.md`: v1.1.2対応
+- `03_detailed_design.md` 〜 `07_system_test.md`: 全工程をv1.1.2対応に更新
+
+---
+
+## 5-1. リリースノート (v1.1.1)
 
 ### 新機能
 - **D&DによるファイルオープンUI**（v1.1.0〜）: 左ペインをフォルダツリーからD&Dゾーンに変更。エクスプローラーからMDファイルをドロップして開く方式に刷新。
@@ -147,8 +165,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.1.1
-   git push origin v1.1.1
+   git tag v1.1.2
+   git push origin v1.1.2
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。

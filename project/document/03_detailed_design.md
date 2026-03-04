@@ -4,7 +4,7 @@
 |------|------------|------------------------------------------|
 | 1.0.0 | 2026-03-03 | 初版作成（基本設計 v1.0.0 対応） |
 | 1.1.0 | 2026-03-03 | MDファイルD&D方式に変更。`dialog:openFolder`/`fs:readDir`廃止、ツリー関連実装廃止 |
-| 1.1.1 | 2026-03-04 | `nodeIntegration: true` に変更（Toast UI Editor の `require()` ロード対応。本アプリは完全ローカル動作のため許容） |
+| 1.1.1 | 2026-03-04 | `contextIsolation: false` / `nodeIntegration: true` に修正。renderer.js の `require('@toast-ui/editor')` を東悳に有効化。本アプリは完全ローカル動作・外部URLナビゲーションなしのため許容（prosemirror依存パッケージがESM専用ビルドのみでscriptタグUMD方式が不可のため） |
 
 ## 1. ディレクトリ構造・ファイル構成
 ```
@@ -35,7 +35,7 @@ project/
 
 | 関数名 | 引数 | 戻り値 | 処理内容 | 異常系 |
 |:---|:---|:---|:---|:---|
-| `createWindow` | なし | `void` | `BrowserWindow` インスタンス生成、`index.html` ロード。<br> `webPreferences`: { `preload`, `contextIsolation: true`, `nodeIntegration: true` }<br>※ローカル固定HTMLのみ読み込み・外部URLナビゲーションなしのため許容 | ロード失敗時ログ出力 |
+| `createWindow` | なし | `void` | `BrowserWindow` インスタンス生成、`index.html` ロード。<br> `webPreferences`: { `preload`, `contextIsolation: false`, `nodeIntegration: true` }<br>※外部URLナビゲーションなし・完全ローカル動作のため許容。`require()` はrenderrer.jsで有効になり、Toast UI Editorを標準のCommonJSロードで初期化できる | ロード失敗時ログ出力 |
 | `handleReadFile` | `filePath` | `Promise<string>` | `fs.readFile` (Buffer) → `chardet` で判定 → `iconv-lite` でUTF-8デコードして返す。 | ファイル不在、読み取り権限不可 |
 | `handleSaveFile` | `filePath`, `content` | `Promise<void>` | `fs.writeFile` でUTF-8で上書き保存。 | 書き込み権限エラー |
 | `handleCreateFile` | `dirPath`, `fileName` | `Promise<string>` | `path.join` でパス生成。<br>`fs.writeFile` で空文字作成。<br>成功ならフルパスを返す。 | 同名ファイル存在時エラー |
@@ -44,7 +44,10 @@ project/
 | `handleShowConfirm`| `message` | `Promise<boolean>` | `dialog.showMessageBox` (type: question, buttons: ['OK', 'Cancel'])。<br>response === 0 を返す。 | |
 
 ## 3. プリロードスクリプト (src/preload.js)
-`contextBridge.exposeInMainWorld('api', { ... })` を使用し、レンダラーへ安全なAPIを公開する。
+
+> **[変更] v1.1.1**: `contextIsolation: false` に伴い `contextBridge.exposeInMainWorld` を廃止。`window.api = { ... }` への直接代入に変更する（Electron 28 では `contextIsolation: false` 時に `contextBridge` が TypeError を投げるため）。
+
+`window.api` に直接 IPC ラッパーを代入し、レンダラーへ公開する。
 
 ### 3.1. 公開API (`window.api`)
 
@@ -81,7 +84,11 @@ HTML操作とイベントリスナーの設定を行う。
 ### 4.3. モジュール/関数仕様
 
 #### 4.3.1. エディタ初期化 (`initializeEditor`)
-- Toast UI Editor を `#editor-container` にインスタンス化。
+
+> **[変更] v1.1.1**: `contextIsolation: false` / `nodeIntegration: true` に修正。`renderer.js` の `require('@toast-ui/editor')` は引き続き使用する（変更なし）。prosemirror各パッケージがESM専用ビルドのみであり、scriptタグにUMDロードが不可のため、`nodeIntegration`によるCommonJSロード方式を採用する。
+
+- `renderer.js` 先頭: `const Editor = require('@toast-ui/editor');`（変更なし）
+- `Editor` を `#editor-container` にインスタンス化。
 - オプション: `initialEditType: 'wysiwyg'`, `previewStyle: 'vertical'`, `height: '100%'`
 - イベント登録: `change` イベントで `setUnsaved(true)` を呼ぶ。
 
