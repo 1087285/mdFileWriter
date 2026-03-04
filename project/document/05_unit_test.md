@@ -7,6 +7,7 @@
 | 1.2.0 | 2026-03-03 | BUG-01 修正対応。validatePath 接続・テスト追加・全件再実行 |
 | 1.2.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration/require化）。integration.test.js のモック方式を `global.toastui` → `jest.mock('@toast-ui/editor')` に変更。26/26 PASS 再確認 |
 | 1.3.0 | 2026-03-04 | 実装 v1.1.2 対応（contextIsolation: false・preload.js 直接代入）。26/26 PASS 再確認 |
+| 1.4.0 | 2026-03-04 | 実装 v1.2.0 対応（trailing-space改行 CommonMark準拠）。`preprocessMarkdown` 関数の単体テスト IT-MD-001〜004 を integration.test.js に追加。30/30 PASS 確認 |
 
 ## 1. 評価概要
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)
@@ -19,7 +20,7 @@
 
 ## 3. テスト項目と結果
 
-### 3.1. メインプロセス (main.test.js) — 12/12 PASS
+### 3.1. メインプロセス (main.test.js) — 18/18 PASS
 
 | ID | 機能 | テストケース | 結果 | 備考 |
 |:---|:---|:---|:---|:---|
@@ -42,7 +43,7 @@
 | UT-V-005 | パストラバーサル防御 | `fs:renamePath` の oldPath に `..` を含むとエラーになること | **PASS** | BUG-01 fix |
 | UT-V-006 | パストラバーサル防御 | `fs:renamePath` の newPath に `..` を含むとエラーになること | **PASS** | BUG-01 fix |
 
-### 3.2. レンダラープロセス (integration.test.js) — 8/8 PASS
+### 3.2. レンダラープロセス (integration.test.js) — 12/12 PASS
 
 | ID | 機能 | テストケース | 結果 | 備考 |
 |:---|:---|:---|:---|:---|
@@ -54,8 +55,12 @@
 | IT-IPC-005 | 削除 | 削除ボタン押下で確認後 deletePath が呼ばれる | **PASS** | |
 | IT-IPC-006 | リネーム | リネームボタン押下で renamePath が正しいパスで呼ばれる | **PASS** | |
 | IT-STATE-001 | 未保存検知 | 編集変更で未保存インジケータが表示される | **PASS** | |
+| IT-MD-001 | trailing-space改行 | trailing-space 2個を含む行読み込み時、`setMarkdown` が行末スペース2個を維持して呼ばれること | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
+| IT-MD-002 | trailing-space改行 | trailing-space 3個以上を含む行は2スペースに正規化されて `setMarkdown` が呼ばれること | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
+| IT-MD-003 | trailing-space改行 | trailing-space なしの通常Markdownは前処理で変化しないこと | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
+| IT-MD-004 | trailing-space改行 | 複数行で trailing-space が混在するとき、全行に正規化が適用されること | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
 
-**総合結果**: **26/26 Pass**
+**総合結果**: **30/30 Pass**
 
 ## 4. 不具合・課題
 
@@ -78,6 +83,7 @@
 - `validatePath` による `..` パストラバーサル防御を全5ハンドラに実装・テスト済み（BUG-01 解決）。
 - `contextIsolation: false` / `nodeIntegration: true` による Toast UI Editor の `require()` ロードが正常動作（BUG-03/04 解決）。
 - preload.js の `window.api` 直接代入方式が単体テストおよびrendererテストで確認済み（BUG-04 解決）。
+- `preprocessMarkdown` による trailing-space（2スペース+改行）の CommonMark 準拠正規化を実装・テスト済み（IT-MD-001〜004 PASS）。3スペース以上の行末スペースは2スペースに正規化され、スペースなしの行は無変化であることを確認（実装 v1.2.0 対応）。
 - Windows環境でのビルドには wine が必要（Linux環境での制約）。
 
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)

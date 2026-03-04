@@ -232,3 +232,73 @@ describe('Integration: Renderer v1.1.0 D&D方式', () => {
     });
 });
 
+// ----------------------------------------------------------------
+// v1.2.0: preprocessMarkdown（trailing-space改行）対応テスト
+// ----------------------------------------------------------------
+describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', () => {
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        // 未保存状態でD&Dしても確認をスキップできるように設定
+        mockApi.showConfirm.mockResolvedValue(true);
+    });
+
+    test('IT-MD-001: trailing-space 2個を含む行を読み込むとき、setMarkdown が行末スペース2個を維持して呼ばれること', async () => {
+        // CommonMark: "line A  \n" は <br> に変換される
+        const input = 'line A  \nline B';
+        mockApi.readFile.mockResolvedValue(input);
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('trailing2.md', '/path/to/trailing2.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        // 2スペースはそのまま保持されること
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B');
+    });
+
+    test('IT-MD-002: trailing-space 3個以上を含む行は2スペースに正規化されて setMarkdown が呼ばれること', async () => {
+        // 3スペース → 正規化で2スペースになる
+        const input = 'line A   \nline B';
+        mockApi.readFile.mockResolvedValue(input);
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('trailing3.md', '/path/to/trailing3.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B');
+    });
+
+    test('IT-MD-003: trailing-space なしの通常Markdownは前処理で変化しないこと', async () => {
+        const input = '# Title\nline A\nline B';
+        mockApi.readFile.mockResolvedValue(input);
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('notrailing.md', '/path/to/notrailing.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('# Title\nline A\nline B');
+    });
+
+    test('IT-MD-004: 複数行で trailing-space が混在するとき、全行に正規化が適用されること', async () => {
+        // line A: 2スペース → 変化なし
+        // line B: 5スペース → 2スペースに正規化
+        // line C: スペースなし → 変化なし
+        const input = 'line A  \nline B     \nline C';
+        mockApi.readFile.mockResolvedValue(input);
+
+        const dropZone = document.getElementById('drop-zone');
+        const dropEvent = createDropEvent('multitrailing.md', '/path/to/multitrailing.md');
+        dropZone.dispatchEvent(dropEvent);
+
+        await new Promise(r => setTimeout(r, 100));
+
+        expect(MockEditorCtor.lastInstance.setMarkdown).toHaveBeenCalledWith('line A  \nline B  \nline C');
+    });
+});
+

@@ -6,13 +6,14 @@
 | 1.1.0 | 2026-03-03 | 実装 v1.1.0（D&D方式）対応。評価項目全面更新・全件再実行 |
 | 1.1.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration変更・ require化）。BUG-03 追記、nodeIntegration 記述修正、重複セクション削除 |
 | 1.2.0 | 2026-03-04 | 実装 v1.1.2 対応（contextIsolation: false・preload.js 直接代入）。BUG-04 追記、基本設計対応表修正 |
+| 1.3.0 | 2026-03-04 | 実装 v1.2.0 対応（trailing-space CommonMark準拠）。IT-MD-001〜004 追記、総合結果・基本設計対応表更新 |
 
 ## 1. 評価概要
 
 - **評価対象**: レンダラープロセス (`src/renderer/renderer.js`) ⇔ メインプロセス (`src/main.js`) の IPC 通信結合フロー
 - **評価方法**: Jest + JSDOM による自動テスト（`integration.test.js`）
-- **テスト実施日**: 2026-03-03（初回）/ 2026-03-04（v1.1.2 再確認）
-- **基本設計参照**: `02_basic_design.md` v1.1.0
+- **テスト実施日**: 2026-03-03（初回）/ 2026-03-04（v1.1.2 再確認・v1.2.0 追加確認）
+- **基本設計参照**: `02_basic_design.md` v1.2.0
 
 ## 2. 評価環境
 
@@ -45,7 +46,16 @@
 |:--|:--|:--|:--|:--|
 | IT-STATE-001 | 編集変更 → 未保存インジケータ表示 | `editor.change` → `setUnsaved(true)` → `#unsaved-indicator` 表示 | **PASS** | |
 
-**総合結果: 8/8 Pass**
+### 3.4. Markdown前処理フロー（v1.2.0）
+
+| ID | テストケース | 結合パス | 結果 | 備考 |
+|:--|:--|:--|:--|:--|
+| IT-MD-001 | trailing-space 2個維持 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A  \nline B')` | **PASS** | 2スペースはそのまま保持 |
+| IT-MD-002 | trailing-space 3個以上→2スペース正規化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A  \nline B')` | **PASS** | `/ {2,}\n/g` → `'  \n'` |
+| IT-MD-003 | trailing-space なしの行は無変化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 入力と同一 | **PASS** | |
+| IT-MD-004 | 複数行混在の全行正規化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 各行を正規化 | **PASS** | |
+
+**総合結果: 12/12 Pass**
 
 ## 4. 基本設計との対応確認
 
@@ -59,6 +69,7 @@
 | 未保存変更インジケータ | `change` イベント連動 | ✅ 確認済 |
 | `contextIsolation: false` / `nodeIntegration: true` | `main.js` で設定。`preload.js` の `window.api` 直接代入（`contextBridge` 不使用）。レンダラー内 `require('@toast-ui/editor')` によるライブラリロード | ✅ 確認済（v1.1.2対応） |
 | パストラバーサル対策 | `validatePath` を全ハンドラで呼び出し（UT-V-001〜006 確認済） | ✅ 確認済 |
+| CommonMark準拠: trailing-space改行（v1.2.0） | `preprocessMarkdown` による `/ {2,}\n/g` → `'  \n'` 正規化（IT-MD-001〜004 確認済） | ✅ 確認済 |
 
 ## 5. 不具合・課題
 
@@ -81,6 +92,6 @@
 
 レンダラープロセスの D&D 読み込み・ファイル操作・未保存検知の各フローにおいて、IPC 結合動作が基本設計 v1.1.0 通りであることを確認した。  
 実装 v1.1.2（`contextIsolation: false` / `window.api` 直接代入）への変更後も BUG-04 が解決され、D&D フローが正常動作することを再確認した。  
-単体テスト（26件）と結合テスト（8件）の合計 **34件すべて合格** 。  
+単体テスト（30件）と結合テスト（12件）の合計 **42件すべて合格** 。  
 ツールバー実動作・モード切替・ショートカットキーは実機評価（07）に委ねる。  
 **システム評価（07）への引き渡し条件を充足する。**

@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.1.2 |
+| バージョン | v1.2.0 |
 | リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -21,8 +21,8 @@
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
 | 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク） |
-| 05 単体評価 | ✅ 26/26 Pass | BUG-01（validatePath）対応済み。jest.mock方式もv1.1.1対応済み。v1.1.2実装対応で全26/26 PASS再確認済み |
-| 06 結合評価 | ✅ 8/8 Pass | 34件全件合格 |
+| 05 単体評価 | ✅ 30/30 Pass | BUG-01（validatePath）対応済み。v1.2.0 preprocessMarkdown 対応テスト（IT-MD-001〜004）追加済み |
+| 06 結合評価 | ✅ 12/12 Pass | 42件全件合格 |
 | 07 システム評価 | ✅ 条件付き合格 | UIの最終確認はWindows実機で行うこと |
 | **総合判定** | **✅ リリース可** | |
 
@@ -38,8 +38,8 @@
 | UI (HTML/CSS/JS) | `project/src/renderer/` |
 | ビルド設定 | `project/package.json` (electron-builder) |
 | CI/CDワークフロー | `.github/workflows/build-release.yml` |
-| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.1.2.exe` (GitHub Actionsで生成) |
-| ポータブル実行ファイル | `project/dist/MdFileWriter 1.1.2.exe` (GitHub Actionsで生成) |
+| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.2.0.exe` (GitHub Actionsで生成) |
+| ポータブル実行ファイル | `project/dist/MdFileWriter 1.2.0.exe` (GitHub Actionsで生成) |
 | HOWTOUSEドキュメント | `HOWTOUSE.md` |
 | リリースノート | 本ドキュメント |
 
@@ -75,7 +75,28 @@
 
 ---
 
-## 5-0. リリースノート (v1.1.2)
+## 5-0. リリースノート (v1.2.0)
+
+### 機能追加
+- **CommonMark準拠: trailing-space強制改行対応**（不具合#1対応）
+  - `renderer.js` に `preprocessMarkdown()` 関数を追加
+  - MDファイル読み込み時（`loadFile`）に `editor.setMarkdown()` 呼び出し前に前処理を実行
+  - 行末スペース2個以上（`/ {2,}\n/g`）を正確に2スペース（`  \n`）に正規化し、CommonMark仕様の `<br>` 相当レンダリングを保証
+- **タスクリストコマンド追加**
+  - ツールバーの `commandMap` に `TaskList: () => editorInstance.exec('taskList')` を追加
+  - `- [ ]` / `- [x]` 記法をGFM拡張として対応
+
+### テスト
+- 単体テスト: 30/30 PASS（`preprocessMarkdown` 単体テスト IT-MD-001〜004 追加）
+- 結合テスト: 12/12 PASS（Markdown前処理フロー追加）
+
+### ドキュメント
+- `HOWTOUSE.md`: v1.2.0対応（タスクリスト・trailing-space注意事項を追記）
+- `03_detailed_design.md` 〜 `07_system_test.md`: 全工程をv1.2.0対応に更新
+
+---
+
+## 5-0b. リリースノート (v1.1.2)
 
 ### バグ修正
 - **BUG-04**: MDファイルD&D時に禁止マークが出てドロップできない問題を修正
@@ -165,8 +186,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.1.2
-   git push origin v1.1.2
+   git tag v1.2.0
+   git push origin v1.2.0
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。
@@ -175,6 +196,7 @@
 ### 6.2. 事前確認チェックリスト（push前）
 
 - [x] `project/package.json` の `version` フィールドがリリースバージョンと一致しているか
+- [x] `project/package.json` の `version` が `1.2.0` であること
 - [x] `08_release.md` のバージョン・日付が正しいか
 - [x] `HOWTOUSE.md` が最終仕様と一致しているか
 - [x] すべてのテストが Pass していることを確認（`npm test`）

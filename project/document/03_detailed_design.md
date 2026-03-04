@@ -4,7 +4,8 @@
 |------|------------|------------------------------------------|
 | 1.0.0 | 2026-03-03 | 初版作成（基本設計 v1.0.0 対応） |
 | 1.1.0 | 2026-03-03 | MDファイルD&D方式に変更。`dialog:openFolder`/`fs:readDir`廃止、ツリー関連実装廃止 |
-| 1.1.1 | 2026-03-04 | `contextIsolation: false` / `nodeIntegration: true` に修正。renderer.js の `require('@toast-ui/editor')` を東悳に有効化。本アプリは完全ローカル動作・外部URLナビゲーションなしのため許容（prosemirror依存パッケージがESM専用ビルドのみでscriptタグUMD方式が不可のため） |
+| 1.1.1 | 2026-03-04 | `contextIsolation: false` / `nodeIntegration: true` に修正。renderer.js の `require('@toast-ui/editor')` を有効化。本アプリは完全ローカル動作・外部URLナビゲーションなしのため許容（prosemirror依存パッケージがESM専用ビルドのみでscriptTag UMD方式が不可のため） |
+| 1.2.0 | 2026-03-04 | CommonMark準拠対応。`preprocessMarkdown()`関数仕様を追加。`loadFile`に前処理呼び出しを追加。ツールバーにタスクリストコマンドを追加（基本設計 v1.2.0 対応） |
 
 ## 1. ディレクトリ構造・ファイル構成
 ```
@@ -105,9 +106,17 @@ HTML操作とイベントリスナーの設定を行う。
 
 #### 4.3.3. ファイル読み込み (`loadFile`)
 - `window.api.readFile(path)` を実行。
-- 成功時: `editor.setMarkdown(content)` (Toast UI EditorはMD入力で内部HTML変換する)。
+- 成功時: `preprocessMarkdown(content)` で前処理した後、`editor.setMarkdown(processedContent)` を呼び出す。
 - `isUnsaved = false`、`currentFilePath = path` 更新。
 - タブ/タイトルバーにファイル名表示。
+
+#### 4.3.3a. Markdown前処理 (`preprocessMarkdown`)
+- **目的**: `editor.setMarkdown()` 呼び出し前にCommonMark準拠のレンダリングを保証する。
+- **签名**: `preprocessMarkdown(content: string): string`
+- **処理内容**:
+  1. **trailing-space原行保護**: Toast UI Editorが行末スペース2個を除去する場合、`/ {2,}\n/g` → `'  \n'` で入力を正規化して渡す。または Toast UI Editor の Markdownパーサオプション（`extendedAutolinks`等）で解決できる場合はその設定を優先する。実装工程で検証・確定すること。
+  2. 将来的なCommonMark非互换土圖土南への対応拡張点。
+- **テスト観点**: `'  \n'` を含むMarkdownを読み込んだ際、WYSIWYG上で改行（`<br>`相当）として表示されること。
 
 #### 4.3.4. ファイル保存 (`saveFile`)
 - `editor.getMarkdown()` を取得。
@@ -120,6 +129,7 @@ HTML操作とイベントリスナーの設定を行う。
     - **太字**: `editor.exec('bold')`
     - **見出し**: `editor.exec('heading', {level: 1})`
     - **リスト**: `editor.exec('ul')` / `editor.exec('ol')`
+    - **タスクリスト**: `editor.exec('taskList')`（Toast UI Editor v3 GFM拡張。未対応の場合はカスタムボタン実装で対応する）
     - **表**: `editor.exec('addTable')`
     - **Undo/Redo**: エディタインスタンスには直接公開メソッドがない場合があるため、標準ツールバーを利用するか、内部CodeMirrorインスタンスへのアクセス要検討。
     - *（注記: 初期実装ではToastUI標準ツールバーのカスタマイズ設定を優先し、不足時のみ自作ボタン実装とする）*
@@ -147,4 +157,6 @@ HTML操作とイベントリスナーの設定を行う。
 - **F04 (新規)**: 同名ファイル時のエラー、特殊文字ファイル名の扱い。
 - **E01 (読込)**: Shift-JISファイルが化けずに開けるか。
 - **E02 (編集)**: 太字、リスト等が正常にMarkdownに変換されるか。
+- **E03 (CommonMark準拠)**: 行末スペース2個を含むMDファイル読み込み時、WYSIWYG上で`<br>`相当の改行として表示されるか。見出し・表・コードブロック・引用・リンク・画像・水平線が正確にレンダリングされるか。保存後のMDファイルで構文が崩れていないか。
+- **E04 (タスクリスト)**: `- [ ]`/`- [x]`を含むMDファイル読み込み時にチェックボックスとして表示されるか。ツールバーからタスクリストを挿入できるか。保存後のMDファイルに`- [ ]`記法が保存されるか。
 - **E06 (未保存)**: 編集中に `*` が出るか。閉じる時に警告が出るか。

@@ -81,12 +81,24 @@ function setupDropZone() {
 }
 
 /**
+ * Preprocess Markdown for CommonMark compliance
+ * Ensures trailing-space line breaks (2+ spaces before \n) are preserved
+ * when passed to Toast UI Editor's setMarkdown().
+ * Toast UI Editor may strip trailing spaces; this normalizes them to exactly 2.
+ */
+function preprocessMarkdown(content) {
+    // Normalize trailing spaces (2 or more) before newline to exactly 2 spaces
+    return content.replace(/ {2,}(\n)/g, '  $1');
+}
+
+/**
  * File Operations
  */
 async function loadFile(filePath) {
     try {
         const content = await window.api.readFile(filePath);
-        editorInstance.setMarkdown(content);
+        const processed = preprocessMarkdown(content);
+        editorInstance.setMarkdown(processed);
         // Reset unsaved after loading (setMarkdown might trigger change)
         setTimeout(() => {
             currentFilePath = filePath;
@@ -201,6 +213,7 @@ const commandMap = {
     'Strike': () => editorInstance.exec('strike'),
     'UL': () => editorInstance.exec('bulletList'),
     'OL': () => editorInstance.exec('orderedList'),
+    'TaskList': () => editorInstance.exec('taskList'),
     'HR': () => editorInstance.exec('hr'),
     'Table': () => editorInstance.exec('addTable'),
     'Image': () => editorInstance.exec('addImage'),
