@@ -9,13 +9,15 @@
 | 1.2.0 | 2026-03-04 | CommonMark準拠対応（`preprocessMarkdown()`追加・`loadFile`更新）。タスクリストツールバーボタン追加（詳細設計 v1.2.0 対応） |
 | 1.3.0 | 2026-03-04 | 不具合 #2 対応。`initEditor()` に `customHTMLRenderer.hardBreak` を追加し、WYSIWYG上でのtrailing-space改行（`<br>`）レンダリングを実装（詳細設計 v1.3.0 対応） |
 | 1.4.0 | 2026-03-04 | 不具合 #2 再対応。`customHTMLRenderer.hardBreak` を削除（WYSIWYG ProseMirror 描画に無効と確認）。`preprocessMarkdown` を `<br>\n` 変換方式に変更（詳細設計 v1.4.0 対応） |
+| 1.5.0 | 2026-03-04 | 不具合 #3 修正。`preprocessMarkdown` の変換方式を `<br>\n` → `\\\n`（CommonMark バックスラッシュ改行）に変更。`integration.test.js` IT-MD-001〜004/006 期待値更新 |
 
 ## 1. 実装概要
 詳細設計書（v1.1.0）に基づき、メインプロセス、レンダラープロセス、UIの実装を行った。  
 v1.1.0 では「フォルダ選択＋ファイルツリー方式」を廃止し、**MDファイルD&D方式**へ変更した。  
 v1.2.0 では不具合#1対応として **`preprocessMarkdown()`** によるCommonMark準拠の前処理、および**タスクリストツールバーボタン**を追加した。  
 v1.3.0 では不具合#2対応として **`customHTMLRenderer.hardBreak`** を追加し、WYSIWYG上でのtrailing-space改行を `<br>` として確実にレンダリングするよう修正した。  
-v1.4.0 では v1.3.0 修正が Windows 実機で無効と判明したため、**`customHTMLRenderer.hardBreak` を削除**し、**`preprocessMarkdown` を `<br>\n` 変換方式**に変更した。
+v1.4.0 では v1.3.0 修正が Windows 実機で無効と判明したため、**`customHTMLRenderer.hardBreak` を削除**し、**`preprocessMarkdown` を `<br>\n` 変換方式**に変更した。  
+v1.5.0 では不具合 #3 対応として `preprocessMarkdown` の変換方式を **`\\\n`（CommonMark バックスラッシュ改行）**に変更し、Markdown ソースビューのコンテンツ崩れを解消した。
 
 ## 2. 実装詳細
 
@@ -147,6 +149,23 @@ v1.1.1で `nodeIntegration: true` まで修正したが、`contextIsolation: tru
 - 標準対応。詳細設計 v1.4.0 の内容を完全に実装した。
 - **実機確認（ST-E03 Manual）必須**: `setMarkdown('<br>\n' を含む文字列)` が WYSIWYG 上で改行として表示されること、および `getMarkdown()` 保存時に `  \n`（trailing-space 2個）として復元されることを Windows 実機で確認すること。検証前に不具合 #2 はクローズしない。
 
+## 3f. 実装記録（v1.5.0）
+
+### 変更内容
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/renderer/renderer.js` | 変更 | `preprocessMarkdown()` の変換先を `'<br>\n'` から `'\\\n'`（バックスラッシュ + 改行、CommonMark §6.7 バックスラッシュ改行）に変更 |
+| `test/integration.test.js` | 変更 | IT-MD-001・IT-MD-002・IT-MD-004 の `setMarkdown` 期待値を `'<br>\n'` → `'\\\n'` に更新 |
+
+### 変更理由
+v1.4.0 の `<br>\n` 変換方式で `setMarkdown()` → `getMarkdown()` の round-trip を行った際、Toast UI Editor が `<br>` インライン HTML を内部パースする過程でコンテンツ行の順序が崩れる不具合 #3 が発生した。  
+CommonMark バックスラッシュ改行（`\` + 改行）は HTML パイプラインを経由せず `getMarkdown()` 往復後もコンテンツが保持されるため、この方式に変更した。
+
+### 詳細設計との差分
+- `preprocessMarkdown` の変換先が詳細設計 v1.4.0 と異なる（`<br>\n` → `\\\n`）。詳細設計 v1.4.0 の修正案に含まれる案 B を実装した形。
+- **実機確認（ST-E03 Manual）**: バックスラッシュ改行が WYSIWYG 上で改行として表示されることを Windows 実機（ST-E03 Manual）で確認すること。
+
 ## 4. 既知の問題・制約
 - **リネームUI**: Electronで `prompt()` の動作が制限される場合があるため、カスタムモーダルへの改修が望ましい。
 - **新規作成の場所**: ファイルを開いていない状態では新規作成できない設計になっている（D&D後のみ操作可能）。
@@ -171,7 +190,7 @@ v1.1.1で `nodeIntegration: true` まで修正したが、`contextIsolation: tru
 | 未保存検知 | 編集後の`*`表示、ファイル切替時の確認 |
 | ツールバー | 各書式ボタンがToast UIコマンドを発行 |
 | ヂード切替 | WYSIWYGとMarkdownモードの切り替え |
-| `preprocessMarkdown` | trailing-space 2個以上 → `<br>\n` 変換、スペース1個は変換されないこと |
+| `preprocessMarkdown` | trailing-space 2個以上 → `\\\n`（バックスラッシュ改行）変換、スペース1個は変換されないこと |
 | `customHTMLRenderer` 削除確認 | `initEditor()` の `Editor` コンストラクタに `customHTMLRenderer` キーが存在しないこと |
 | `preprocessMarkdown` WYSIWYG表示 | trailing-space を含む `.md` 読み込み後 WYSIWYG 上で改行として表示されるか（Windows 実機確認必須） |
 | タスクリストボタン | `- [ ]` 形式で挿入されるか、保存後のMDに`- [ ]`記法が保存されるか |

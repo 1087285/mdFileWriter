@@ -9,6 +9,7 @@
 | 1.3.0 | 2026-03-04 | 実装 v1.2.0 対応（trailing-space CommonMark準拠）。IT-MD-001〜004 追記、総合結果・基本設計対応表更新 |
 | 1.4.0 | 2026-03-04 | 実装 v1.3.0 対応（不具合 #2 対応）。IT-MD-005〜006 追記、総合結果・基本設計対応表更新。32/32 PASS 確認 |
 | 1.5.0 | 2026-03-04 | 実装 v1.4.0 対応（不具合 #2 再対応）。`customHTMLRenderer` 削除・`preprocessMarkdown` `<br>\n` 変換方式変更を反映。IT-MD-001〜006 更新・基本設計対応表更新。32/32 PASS 確認 |
+| 1.6.0 | 2026-03-04 | 実装 v1.5.0 対応（不具合 #3 修正）。`preprocessMarkdown` バックスラッシュ改行方式変更を反映。IT-MD-001〜006 期待値・説明更新・基本設計対応表更新。32/32 PASS 確認 |
 
 ## 1. 評価概要
 
@@ -48,21 +49,21 @@
 |:--|:--|:--|:--|:--|
 | IT-STATE-001 | 編集変更 → 未保存インジケータ表示 | `editor.change` → `setUnsaved(true)` → `#unsaved-indicator` 表示 | **PASS** | |
 
-### 3.4. Markdown前処理フロー（v1.4.0: `<br>\n` 変換方式）
+### 3.4. Markdown前処理フロー（v1.5.0: バックスラッシュ改行方式）
 
 | ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
-| IT-MD-001 | trailing-space 2個 → `<br>\n` 変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A<br>\nline B')` | **PASS** | `/ {2,}\n/g` → `'<br>\n'`（v1.4.0方式） |
-| IT-MD-002 | trailing-space 3個以上も `<br>\n` に変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に `<br>\n` | **PASS** | v1.4.0方式 |
+| IT-MD-001 | trailing-space 2個 → バックスラッシュ改行変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown('line A\\\nline B')` | **PASS** | `/ {2,}\n/g` → `'\\\n'`（v1.5.0方式） |
+| IT-MD-002 | trailing-space 3個以上もバックスラッシュ改行に変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に `\\\n` | **PASS** | v1.5.0方式 |
 | IT-MD-003 | trailing-space なしの行は無変化 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 入力と同一 | **PASS** | |
-| IT-MD-004 | 複数行混在の全行変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 各行を `<br>\n` 変換 | **PASS** | |
+| IT-MD-004 | 複数行混在の全行変換 | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` 各行を `\\\n` 変換 | **PASS** | |
 
-### 3.5. customHTMLRenderer 削除確認・trailing-space 境界条件フロー（v1.4.0）
+### 3.5. customHTMLRenderer 削除確認・trailing-space 境界条件フロー（v1.4.0/v1.5.0）
 
 | ID | テストケース | 結合パス | 結果 | 備考 |
 |:--|:--|:--|:--|:--|
 | IT-MD-005 | `customHTMLRenderer` が **存在しない**こと（v1.4.0削除確認） | `initEditor` → `new Editor(options)` → `options.customHTMLRenderer` が `undefined` であること | **PASS** | `MockEditorCtor.lastOptions` で確認。v1.4.0にて削除済み |
-| IT-MD-006 | trailing-space 1個の行末は `<br>\n` に変換されないこと | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に trailing-space 1個は `<br>\n` 変換なしで渡される | **PASS** | `/ {2,}\n/g` の正規表現により1個は対象外 |
+| IT-MD-006 | trailing-space 1個の行末はバックスラッシュ改行に変換されないこと | `drop` → `readFile` → `preprocessMarkdown` → `setMarkdown` に trailing-space 1個はバックスラッシュ改行変換なしで渡される | **PASS** | `/ {2,}\n/g` の正規表現により1個は対象外 |
 
 **総合結果: 14/14 Pass**
 
@@ -78,9 +79,9 @@
 | 未保存変更インジケータ | `change` イベント連動 | ✅ 確認済 |
 | `contextIsolation: false` / `nodeIntegration: true` | `main.js` で設定。`preload.js` の `window.api` 直接代入（`contextBridge` 不使用）。レンダラー内 `require('@toast-ui/editor')` によるライブラリロード | ✅ 確認済（v1.1.2対応） |
 | パストラバーサル対策 | `validatePath` を全ハンドラで呼び出し（UT-V-001〜006 確認済） | ✅ 確認済 |
-| CommonMark準拠: trailing-space改行（v1.4.0） | `preprocessMarkdown` による `/ {2,}\n/g` → `'<br>\n'` 変換（IT-MD-001〜004 確認済）。trailing-space 1個は変換対象外（IT-MD-006 確認済） | ✅ 確認済 |
+| CommonMark準拠: trailing-space改行（v1.5.0） | `preprocessMarkdown` による `/ {2,}\n/g` → `'\\\n'`（バックスラッシュ改行）変換（IT-MD-001〜004 確認済）。trailing-space 1個は変換対象外（IT-MD-006 確認済） | ✅ 確認済 |
 | CommonMark準拠: `customHTMLRenderer` 削除（v1.4.0） | `initEditor()` の `Editor` コンストラクタに `customHTMLRenderer` キーが存在しないこと（IT-MD-005 確認済） | ✅ 確認済 |
-| CommonMark準拠: hardBreak WYSIWYG実レンダリング | `setMarkdown('<br>\n'...)` が WYSIWYG 上で改行として表示されること。Windows 実機（ST-E03 Manual）で確認 | Manual:Pending（実機） |
+| CommonMark準拠: hardBreak WYSIWYG実レンダリング | `setMarkdown('\\\n'...)` が WYSIWYG 上で改行として表示されること。Windows 実機（ST-E03 Manual）で確認 | Manual:Pending（実機） |
 
 ## 5. 不具合・課題
 
@@ -102,7 +103,7 @@
 ## 7. 結論
 
 レンダラープロセスの D&D 読み込み・ファイル操作・未保存検知の各フローにおいて、IPC 結合動作が基本設計 v1.2.0 通りであることを確認した。  
-実装 v1.4.0（`preprocessMarkdown` による `<br>\n` 変換方式・`customHTMLRenderer` 削除）への変更後も 32 件全件 PASS を再確認した。  
+実装 v1.5.0（`preprocessMarkdown` によるバックスラッシュ改行方式・不具合 #3 修正）への変更後も 32 件全件 PASS を再確認した。  
 単体テスト（32件）と結合テスト（14件）の合計 **46件すべて合格** 。  
-ツールバー実動作・モード切替・ショートカットキー・WYSIWYG `<br>` 実表示確認（BUG-02）は実機評価（07）に委ねる。  
+ツールバー実動作・モード切替・ショートカットキー・WYSIWYG バックスラッシュ改行表示確認（BUG-02）は実機評価（07）に委ねる。  
 **システム評価（07）への引き渡し条件を充足する。**

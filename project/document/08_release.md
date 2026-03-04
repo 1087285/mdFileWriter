@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.4.0 |
+| バージョン | v1.5.0 |
 | リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -20,8 +20,8 @@
 | 01 要件定義 | ✅ 完了 | |
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
-| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク）・不具合 #2 再対応（v1.4.0: `customHTMLRenderer` 削除・`preprocessMarkdown` `<br>\n` 変換方式に変更） |
-| 05 単体評価 | ✅ 32/32 Pass | v1.4.0 対応テスト（IT-MD-001〜006）全件合格。`customHTMLRenderer` 削除確認・`<br>\n` 変換確認を含む |
+| 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み・BUG-03修正済み・BUG-04修正済み・不具合 #2 再対応（v1.4.0）・不具合 #3 修正（v1.5.0: `preprocessMarkdown` バックスラッシュ改行方式変更） |
+| 05 単体評価 | ✅ 32/32 Pass | v1.5.0 対応テスト（IT-MD-001〜006）全件合格。バックスラッシュ改行変換確認・`customHTMLRenderer` 削除確認を含む |
 | 06 結合評価 | ✅ 14/14 Pass | 46件全件合格 |
 | 07 システム評価 | ✅ 条件付き合格 | ST-E03 trailing-space WYSIWYG表示はWindows実機確認待ち（Manual:Pending） |
 | **総合判定** | **✅ リリース可** | |
@@ -38,8 +38,8 @@
 | UI (HTML/CSS/JS) | `project/src/renderer/` |
 | ビルド設定 | `project/package.json` (electron-builder) |
 | CI/CDワークフロー | `.github/workflows/build-release.yml` |
-| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.4.0.exe` (GitHub Actionsで生成) |
-| ポータブル実行ファイル | `project/dist/MdFileWriter 1.4.0.exe` (GitHub Actionsで生成) |
+| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.5.0.exe` (GitHub Actionsで生成) |
+| ポータブル実行ファイル | `project/dist/MdFileWriter 1.5.0.exe` (GitHub Actionsで生成) |
 | HOWTOUSEドキュメント | `HOWTOUSE.md` |
 | リリースノート | 本ドキュメント |
 
@@ -75,7 +75,33 @@
 
 ---
 
-## 5-new. リリースノート (v1.4.0)
+## 5-new. リリースノート (v1.5.0)
+
+### バグ修正
+- **Bug #3 修正: Markdownソースタブで行の内容が別の行の内容に化ける**
+  - v1.4.0 の `<br>\n` 変換方式が `setMarkdown()` → `getMarkdown()` round-trip でコンテンツを崩すことが判明（全角文字を含む行で次行の内容が表示される）
+  - `renderer.js` `preprocessMarkdown()` の変換方式を `/ {2,}\n/g` → `'<br>\n'`（inline HTML）から `/ {2,}\n/g` → `'\\\n'`（CommonMark §6.7 バックスラッシュ改行）に変更
+  - HTML パースを経由しないためコンテンツが正確に保持される
+
+### テスト
+- 単体テスト: 32/32 PASS（IT-MD-001〜004 期待値を `\\\n` に更新）
+- 結合テスト: 14/14 PASS（IT-MD-001〜004/006 のバックスラッシュ改行期待値確認）
+
+### ドキュメント
+- `04_implementation.md`: v1.5.0（実装内容を記録）
+- `05_unit_test.md`: v1.7.0（32/32 PASS）
+- `06_integration_test.md`: v1.6.0（14/14 PASS）
+- `07_system_test.md`: v1.6.0（ST-E03 Auto:Pass、Manual:Pending）
+- `09_bug_analysis_report.md`: v1.2.0（Bug #3 解析セクション追加）
+- `HOWTOUSE.md`: v1.5.0（trailing-space 注意事項をバックスラッシュ改行方式に更新）
+
+### 既知の制限・保留事項
+- ST-E03 trailing-space WYSIWYG表示確認: Windows実機での目視確認が必要（Manual:Pending）
+  - 確認完了後に Bug #2 を正式クローズする
+
+---
+
+## 5-new-prev. リリースノート (v1.4.0)（v1.5.0 にて Bug #3 修正済み）
 
 ### バグ修正
 - **Bug #2 再対応: trailing-space（末尾2スペース）WYSIWYGレンダリング修正（方式変更）**

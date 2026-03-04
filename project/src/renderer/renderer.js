@@ -82,14 +82,17 @@ function setupDropZone() {
 
 /**
  * Preprocess Markdown for CommonMark compliance
- * Converts trailing-space line breaks (2+ spaces before \n) to inline <br>
- * so that Toast UI Editor's setMarkdown() processes them as hard_break nodes
- * in the WYSIWYG ProseMirror document, rendering them as visible line breaks.
+ * Converts trailing-space line breaks (2+ spaces before \n) to CommonMark
+ * backslash hard breaks (backslash + newline) so that Toast UI Editor's
+ * setMarkdown() processes them as hard_break nodes in WYSIWYG ProseMirror.
+ * Using <br> inline HTML caused content corruption in Markdown source view
+ * (v1.4.0 regression: bug #3). Backslash hard break is standard CommonMark
+ * and avoids the HTML parsing pipeline that caused content misalignment.
  * On save, getMarkdown() restores hard_break nodes as trailing-space (2 spaces + \n).
  */
 function preprocessMarkdown(content) {
-    // Convert trailing spaces (2 or more) before newline to <br>
-    return content.replace(/ {2,}\n/g, '<br>\n');
+    // Convert trailing spaces (2 or more) before newline to backslash hard break
+    return content.replace(/ {2,}\n/g, '\\\n');
 }
 
 /**

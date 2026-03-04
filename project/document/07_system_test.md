@@ -9,13 +9,14 @@
 | 1.3.0 | 2026-03-04 | v1.2.0対応（trailing-space CommonMark準拠・preprocessMarkdown実装反映）テスト件数更新42件 |
 | 1.4.0 | 2026-03-04 | v1.3.0対応（不具合 #2 customHTMLRenderer.hardBreak 実装反映）。自動テスト件数更新 30→32件。ST-E03 Auto 欄に IT-MD-005〜006 追記。アプリバージョン更新 |
 | 1.5.0 | 2026-03-04 | v1.4.0対応（不具合 #2 再対応）。`customHTMLRenderer` 削除・`preprocessMarkdown` `<br>\n` 変換方式変更をST-E03・結論・リリース判定に反映 |
+| 1.6.0 | 2026-03-04 | v1.5.0対応（不具合 #3 修正）。`preprocessMarkdown` バックスラッシュ改行方式変更をST-E03・結論・リリース判定に反映 |
 
 ## 1. 目的
 本ドキュメントは、mdFileWriterシステムが要件定義書 (`01_requirements.md`) に記載されたすべての要件を満たしていることを確認するためのシステム評価計画および結果報告書である。
 
 ## 2. 評価対象
 - アプリケーション名: mdFileWriter
-- バージョン: **v1.4.0** (Release Candidate)
+- バージョン: **v1.5.0** (Release Candidate)
 - 対象OS: Windows 10 / 11 (※開発環境はUbuntu 24.04 Dev Container)
 
 ## 3. 評価環境
@@ -71,7 +72,7 @@
 | ST-007 | ファイル操作 | リネーム | リネームボタンを押下する | ファイル名入力ダイアログが表示され、入力後にファイル名が変更されること | Auto/Review | Pass |
 | ST-008 | セキュリティ | パストラバーサル防止 | `../`等を含むパスでIPC操作を試みる | `validatePath()`がエラーをスローし操作が拒否されること | Auto | Pass |
 | ST-009 | 保存 | 上書き保存 | 編集後にCtrl+Sまたは保存ボタンを押す | ファイルの内容がUTF-8 Markdownとして更新されること | Auto/Review | Pass |
-| ST-E03 | エディタ | trailing-space改行レンダリング（v1.4.0） | 行末スペース2個（`  \n`）を含む.mdファイルをD&Dで開く | WYSIWYGエディタ上で`<br>`相当の強制改行として表示されること。`preprocessMarkdown`により2個以上のtrailing-spaceが`<br>\n`に変換（inline HTML方式）されてToast UI Editorに渡されること。`customHTMLRenderer`はv1.4.0で削除済みであること | Auto/Manual | Auto:Pass（IT-MD-001〜006）/ Manual:Pending |
+| ST-E03 | エディタ | trailing-space改行レンダリング（v1.5.0） | 行末スペース2個（`  \n`）を含む.mdファイルをD&Dで開く | WYSIWYGエディタ上で強制改行として表示されること。`preprocessMarkdown`により2個以上のtrailing-spaceがバックスラッシュ改行（`\\\n`、CommonMark §6.7）に変換されてToast UI Editorに渡されること。`customHTMLRenderer`はv1.4.0で削除済みであること | Auto/Manual | Auto:Pass（IT-MD-001〜006）/ Manual:Pending |
 | ST-010 | エディタ | WYSIWYG編集 | 文字入力・見出し適用・段落改行を行う | 入力通りに表示され、Markdown記法が適用されること | Manual | Pending |
 | ST-011 | エディタ | 文字装飾 | 太字(Ctrl+B)、斜体(Ctrl+I)、取り消し線を適用する | 選択テキストにスタイルが適用されること | Review | Pass |
 | ST-012 | エディタ | リスト作成 | 箇条書き・番号付きリストを挿入する | リスト形式で表示されること | Manual | Pending |
@@ -128,7 +129,7 @@
   - D&DドロップによるMDファイル読み込み（IT-DND-001〜003）
   - 新規作成・削除・リネームのIPC呼び出し（IT-IPC-003〜006）
   - 未保存インジケータ動作（IT-STATE-001）
-  - `preprocessMarkdown` trailing-space `<br>\n` 変換（IT-MD-001〜004）
+  - `preprocessMarkdown` trailing-space バックスラッシュ改行（`\\\n`）変換（IT-MD-001〜004、v1.5.0 対応）
   - `customHTMLRenderer` 削除確認・trailing-space 1個は非変換（IT-MD-005〜006、不具合 #2 v1.4.0 対応）
 - エビデンス: `project/document/06_integration_test.md` 参照
 
@@ -156,7 +157,7 @@
 - ST-015: WYSIWYGとMarkdownソードモード切替
 - ST-017b: 終了時未保存確認ダイアログ
 - ST-018: exeインストールレス起動
-- ST-E03: trailing-space改行のWYSIWYG実レンダリング確認（`preprocessMarkdown` `<br>\n` 変換ロジックはAutoで IT-MD-001〜006 Pass済み。Toast UI EditorがWYSIWYG上で実際に`<br>`として表示するかは実機確認が必要）
+- ST-E03: trailing-space改行のWYSIWYG実レンダリング確認（`preprocessMarkdown` バックスラッシュ改行（`\\\n`）変換ロジックはAutoで IT-MD-001〜006 Pass済み。Toast UI EditorがWYSIWYG上で実際に強制改行として表示するかは実機確認が必要）
 - ST-020: パフォーマンス（1万文字編集）
 - AC-N-1, AC-N-3, AC-E-3, AC-N-6（Manual部分）
 
@@ -169,8 +170,8 @@
 - D&D方式への変更（v1.1.0）の主要ロジックは Auto/Review で検証済み。
 - 手動テスト（GUI動作・Windows実機）はリリース直前の最終確認として実施する。
 - BUG-04（D&D禁止マーク不具合）は v1.1.2 で解決済みであり、D&Dによるファイル読み込みフローは Auto/Review で確認済み。
-- `preprocessMarkdown` による trailing-space CommonMark `<br>\n` 変換（v1.4.0）はAutoテストで全6件 Pass 済み。
-- `customHTMLRenderer` が `initEditor()` から削除されていること（v1.4.0）は IT-MD-005 で Pass 済み。Toast UI Editor の WYSIWYG 実レンダリング（`<br>` 表示）の最終確認は Windows 実機（ST-E03 Manual）で行う。確認後に不具合 #2 をクローズする。
+- `preprocessMarkdown` による trailing-space CommonMark バックスラッシュ改行（`\\\n`）変換（v1.5.0）はAutoテストで全6件 Pass 済み。
+- `customHTMLRenderer` が `initEditor()` から削除されていること（v1.4.0）は IT-MD-005 で Pass 済み。Toast UI Editor の WYSIWYG 実レンダリング（バックスラッシュ改行表示）の最終確認は Windows 実機（ST-E03 Manual）で行う。確認後に不具合 #2 をクローズする。
 - 現時点でのシステム品質は、ロジック面において「リリース候補（条件付き合格）」であると判断する。
 
 ## 7. 結論
@@ -189,12 +190,15 @@ v1.1.2でのバグ修正として、以下が確認済みである：
 - D&Dドロップ禁止マーク不具合の修正（BUG-04）：`contextIsolation: true` + `nodeIntegration: true` 競合により renderer.js 起動時クラッシュ→`setupDropZone()` 未実行→dragover リスナ未登録 の連鎖を解消。`contextIsolation: false` に変更し、preload.js の `contextBridge.exposeInMainWorld` を `window.api = {...}` 直接代入に変更。修正後 Auto/Review テスト 26件全件 PASS 再確認済み
 
 v1.2.0でのバグ修正・機能追加として、以下が確認済みである：
-- trailing-space（行末スペース2個）CommonMark 準拠レンダリング（不具合#1対応）：`preprocessMarkdown` 関数が導入され、v1.4.0 時点では `/ {2,}\n/g` → `'<br>\n'`（inline HTML 変換）で最終動作（IT-MD-001〜004 PASS）。Toast UI Editor 実レンダリングの `<br>` 表示確認は Windows 実機（ST-E03）にて確認予定。
+- trailing-space（行末スペース2個）CommonMark 準拠レンダリング（不具合#1対応）：`preprocessMarkdown` 関数が導入され、v1.5.0 時点では `/ {2,}\n/g` → `'\\\n'`（バックスラッシュ改行）で最終動作（IT-MD-001〜004 PASS）。Toast UI Editor 実レンダリングの改行表示確認は Windows 実機（ST-E03）にて確認予定。
 
-v1.4.0でのバグ修正として、以下が確認済みである：
-- WYSIWYG上での trailing-space 強制改行非表示（不具合 #2 再対応）：`customHTMLRenderer.hardBreak` が WYSIWYG ProseMirror 描画に有効でないことが Windows 実機で判明（v1.3.0 修正が不十分）。v1.4.0 では `customHTMLRenderer` を削除し、`preprocessMarkdown` を `/ {2,}\n/g` → `'<br>\n'`（inline HTML 変換）方式に変更。`setMarkdown('<br>\n'...)` が ProseMirror に `hard_break` ノードとして取り込まれ WYSIWYG 上で改行として描画される設計。IT-MD-001〜006（Auto）全件 Pass 済み。Toast UI Editor 実レンダリングの最終確認は Windows 実機（ST-E03 Manual）で行い、確認後に不具合 #2 をクローズする。
+v1.5.0でのバグ修正として、以下が確認済みである：
+- Markdownソースタブでの行内容表示崩れ（不具合 #3 修正）：v1.4.0 の `<br>\n` 変換方式が `setMarkdown()` → `getMarkdown()` round-trip でコンテンツを崩すことが判明。`preprocessMarkdown` を `/ {2,}\n/g` → `'\\\n'`（CommonMark バックスラッシュ改行）方式に変更（v1.5.0）。IT-MD-001〜006（Auto）全件 Pass 再確認済み。
+
+v1.4.0でのバグ修正として、以下が確認済みである（v1.5.0 で上書き変更）：
+- WYSIWYG上での trailing-space 強制改行非表示（不具合 #2 再対応）：`customHTMLRenderer.hardBreak` が WYSIWYG ProseMirror 描画に有効でないことが Windows 実機で判明（v1.3.0 修正が不十分）。v1.4.0 では `customHTMLRenderer` を削除し、`preprocessMarkdown` を `<br>\n` 変換方式に変更したが、不具合 #3 が発生したため、v1.5.0 でバックスラッシュ改行方式に変更済み。現在は IT-MD-001〜006（Auto）全件 Pass 済み。Toast UI Editor 実レンダリングの最終確認は Windows 実機（ST-E03 Manual）で行う。
 
 v1.3.0でのバグ修正として、以下が確認済みである（v1.4.0 で上書き対応）：
-- WYSIWYG上での trailing-space 強制改行非表示（不具合 #2 対応）：`initEditor()` に `customHTMLRenderer: { hardBreak() {...} }` を追加（v1.3.0）。ただし Windows 実機で有効でないことが判明し、v1.4.0 で上記の `<br>\n` 変換方式に切り替え済み。
+- WYSIWYG上での trailing-space 強制改行非表示（不具合 #2 対応）：`initEditor()` に `customHTMLRenderer: { hardBreak() {...} }` を追加（v1.3.0）。ただし Windows 実機で有効でないことが判明し、v1.4.0 で `<br>\n` 変換方式、さらに v1.5.0 でバックスラッシュ改行方式に切り替え済み。
 
 最終的なUI動作（WYSIWYG操作、ツールバー、モード切替）とWindows固有の動作については、配布パッケージ作成後の実機手動テストに委ねるものとし、本フェーズ（システム評価）としては **条件付き合格** とする。
