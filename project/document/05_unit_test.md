@@ -8,6 +8,7 @@
 | 1.2.1 | 2026-03-04 | 実装 v1.1.1 対応（nodeIntegration/require化）。integration.test.js のモック方式を `global.toastui` → `jest.mock('@toast-ui/editor')` に変更。26/26 PASS 再確認 |
 | 1.3.0 | 2026-03-04 | 実装 v1.1.2 対応（contextIsolation: false・preload.js 直接代入）。26/26 PASS 再確認 |
 | 1.4.0 | 2026-03-04 | 実装 v1.2.0 対応（trailing-space改行 CommonMark準拠）。`preprocessMarkdown` 関数の単体テスト IT-MD-001〜004 を integration.test.js に追加。30/30 PASS 確認 |
+| 1.5.0 | 2026-03-04 | 実装 v1.3.0 対応（不具合 #2 対応）。`customHTMLRenderer.hardBreak` オプション検証テスト IT-MD-005〜006 を integration.test.js に追加。MockEditorCtor に `lastOptions` を追加。32/32 PASS 確認 |
 
 ## 1. 評価概要
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)
@@ -59,8 +60,10 @@
 | IT-MD-002 | trailing-space改行 | trailing-space 3個以上を含む行は2スペースに正規化されて `setMarkdown` が呼ばれること | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
 | IT-MD-003 | trailing-space改行 | trailing-space なしの通常Markdownは前処理で変化しないこと | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
 | IT-MD-004 | trailing-space改行 | 複数行で trailing-space が混在するとき、全行に正規化が適用されること | **PASS** | `preprocessMarkdown` v1.2.0 対応 |
+| IT-MD-005 | customHTMLRenderer | Editor コンストラクタに `customHTMLRenderer.hardBreak` が渡されていること | **PASS** | `initEditor` v1.3.0 対応（不具合 #2） |
+| IT-MD-006 | customHTMLRenderer | `customHTMLRenderer.hardBreak()` が `[{ type: 'html', content: '<br>' }]` を返すこと | **PASS** | `initEditor` v1.3.0 対応（不具合 #2） |
 
-**総合結果**: **30/30 Pass**
+**総合結果**: **32/32 Pass**
 
 ## 4. 不具合・課題
 
@@ -84,6 +87,7 @@
 - `contextIsolation: false` / `nodeIntegration: true` による Toast UI Editor の `require()` ロードが正常動作（BUG-03/04 解決）。
 - preload.js の `window.api` 直接代入方式が単体テストおよびrendererテストで確認済み（BUG-04 解決）。
 - `preprocessMarkdown` による trailing-space（2スペース+改行）の CommonMark 準拠正規化を実装・テスト済み（IT-MD-001〜004 PASS）。3スペース以上の行末スペースは2スペースに正規化され、スペースなしの行は無変化であることを確認（実装 v1.2.0 対応）。
+- `customHTMLRenderer.hardBreak` オプションが `initEditor()` に正しく設定され、`hardBreak()` が `[{ type: 'html', content: '<br>' }]` を返すことを確認（IT-MD-005〜006 PASS）。WYSIWYG 実レンダリングの `<br>` 表示確認は Windows 実機（ST-E03 Manual）に委ねる（実装 v1.3.0 対応・不具合 #2）。
 - Windows環境でのビルドには wine が必要（Linux環境での制約）。
 
 - **評価対象**: メインプロセス (`src/main.js`) および レンダラープロセス (`src/renderer/renderer.js`)

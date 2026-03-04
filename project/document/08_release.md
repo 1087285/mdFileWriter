@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |:--|:--|
 | アプリ名 | mdFileWriter |
-| バージョン | v1.2.0 |
+| バージョン | v1.3.0 |
 | リリース日 | 2026-03-04 |
 | 対象OS | Windows 10 / 11 |
 | ビルドツール | electron-builder v24.x |
@@ -21,9 +21,9 @@
 | 02 基本設計 | ✅ 完了 | |
 | 03 詳細設計 | ✅ 完了 | |
 | 04 実装 | ✅ 完了 | BUG-04-001〜003修正済み（フォルダダイアログ不起動）・BUG-03修正済み（exeエディタ未初期化）・BUG-04修正済み（D&D禁止マーク） |
-| 05 単体評価 | ✅ 30/30 Pass | BUG-01（validatePath）対応済み。v1.2.0 preprocessMarkdown 対応テスト（IT-MD-001〜004）追加済み |
-| 06 結合評価 | ✅ 12/12 Pass | 42件全件合格 |
-| 07 システム評価 | ✅ 条件付き合格 | UIの最終確認はWindows実機で行うこと |
+| 05 単体評価 | ✅ 32/32 Pass | v1.3.0 customHTMLRenderer.hardBreak 対応テスト（IT-MD-005〜006）追加済み。IT-MD-001〜006 全件合格 |
+| 06 結合評価 | ✅ 14/14 Pass | 46件全件合格 |
+| 07 システム評価 | ✅ 条件付き合格 | ST-E03 trailing-space WYSIWYG表示はWindows実機確認待ち（Manual:Pending） |
 | **総合判定** | **✅ リリース可** | |
 
 ---
@@ -38,8 +38,8 @@
 | UI (HTML/CSS/JS) | `project/src/renderer/` |
 | ビルド設定 | `project/package.json` (electron-builder) |
 | CI/CDワークフロー | `.github/workflows/build-release.yml` |
-| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.2.0.exe` (GitHub Actionsで生成) |
-| ポータブル実行ファイル | `project/dist/MdFileWriter 1.2.0.exe` (GitHub Actionsで生成) |
+| Windowsインストーラ | `project/dist/MdFileWriter Setup 1.3.0.exe` (GitHub Actionsで生成) |
+| ポータブル実行ファイル | `project/dist/MdFileWriter 1.3.0.exe` (GitHub Actionsで生成) |
 | HOWTOUSEドキュメント | `HOWTOUSE.md` |
 | リリースノート | 本ドキュメント |
 
@@ -72,6 +72,32 @@
 | ビルドコマンド | `npm run build` (`electron-builder --win`) |
 | アップロード先 | GitHub Releases |
 | リリースノート参照 | `project/document/08_release.md` |
+
+---
+
+## 5-new. リリースノート (v1.3.0)
+
+### バグ修正
+- **Bug #2対応: trailing-space（末尾2スペース）WYSIWYGレンダリング修正**
+  - `renderer.js` `initEditor()` に `customHTMLRenderer: { hardBreak() { return [{ type: 'html', content: '<br>' }]; } }` を追加
+  - Toast UI Editor (ProseMirror) が CommonMark `hardBreak` AST ノードを WYSIWYG で `<br>` としてレンダリングするように対応
+  - `preprocessMarkdown()` との組み合わせにより、行末スペース正規化 + WYSIWYG `<br>` 表示の両方を保証
+
+### テスト
+- 単体テスト: 32/32 PASS（IT-MD-005〜006 追加: `customHTMLRenderer.hardBreak` 関数渡し確認・戻り値確認）
+- 結合テスト: 14/14 PASS（IT-MD-005〜006 結合テスト追加）
+
+### ドキュメント
+- `03_detailed_design.md`: v1.3.0（`customHTMLRenderer.hardBreak` を必須仕様として明記）
+- `04_implementation.md`: v1.3.0（実装内容を記録）
+- `05_unit_test.md`: v1.5.0（32/32 PASS）
+- `06_integration_test.md`: v1.4.0（14/14 PASS）
+- `07_system_test.md`: v1.4.0（ST-E03 Auto:Pass、Manual:Pending）
+- `HOWTOUSE.md`: v1.3.0（trailing-space WYSIWYG表示の注意事項を更新）
+
+### 既知の制限・保留事項
+- ST-E03 trailing-space `<br>` WYSIWYG表示確認: Windows実機での目視確認が必要（Manual:Pending）
+  - 確認完了後に Bug #2 を正式クローズする
 
 ---
 
@@ -186,8 +212,8 @@
 1. ソースコードが `main` ブランチにマージされていることを確認する。
 2. バージョンタグを作成して push する。
    ```bash
-   git tag v1.2.0
-   git push origin v1.2.0
+   git tag v1.3.0
+   git push origin v1.3.0
    ```
 3. GitHub Actions (`Build & Release (Windows .exe)`) が自動起動する。
 4. `windows-latest` ランナーで `electron-builder --win` が実行されNSISインストーラとポータブルexeが生成される。
@@ -196,7 +222,7 @@
 ### 6.2. 事前確認チェックリスト（push前）
 
 - [x] `project/package.json` の `version` フィールドがリリースバージョンと一致しているか
-- [x] `project/package.json` の `version` が `1.2.0` であること
+- [x] `project/package.json` の `version` が `1.3.0` であること
 - [x] `08_release.md` のバージョン・日付が正しいか
 - [x] `HOWTOUSE.md` が最終仕様と一致しているか
 - [x] すべてのテストが Pass していることを確認（`npm test`）

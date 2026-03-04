@@ -14,6 +14,7 @@ const path = require('path');
 jest.mock('@toast-ui/editor', () => {
     const MockEditorCtor = jest.fn().mockImplementation(function(options) {
         MockEditorCtor.lastInstance = this;
+        MockEditorCtor.lastOptions = options;
         this._changeHandler = (options && options.events && options.events.change) || null;
         this.setMarkdown = jest.fn();
         this.getMarkdown = jest.fn();
@@ -21,6 +22,7 @@ jest.mock('@toast-ui/editor', () => {
         this.changeMode = jest.fn();
     });
     MockEditorCtor.lastInstance = null;
+    MockEditorCtor.lastOptions = null;
     return MockEditorCtor;
 }, { virtual: true });
 
@@ -302,3 +304,22 @@ describe('Integration: preprocessMarkdown v1.2.0 trailing-space改行対応', ()
     });
 });
 
+// ----------------------------------------------------------------
+// v1.3.0: customHTMLRenderer.hardBreak（不具合 #2 対応）テスト
+// ----------------------------------------------------------------
+describe('Integration: customHTMLRenderer.hardBreak v1.3.0 不具合#2対応', () => {
+
+    test('IT-MD-005: Editor コンストラクタに customHTMLRenderer.hardBreak が渡されていること', () => {
+        // lastOptions は clearAllMocks() に影響されないため安全に参照できる
+        const options = MockEditorCtor.lastOptions;
+        expect(options).toBeDefined();
+        expect(options.customHTMLRenderer).toBeDefined();
+        expect(typeof options.customHTMLRenderer.hardBreak).toBe('function');
+    });
+
+    test('IT-MD-006: customHTMLRenderer.hardBreak() が [{ type: "html", content: "<br>" }] を返すこと', () => {
+        const options = MockEditorCtor.lastOptions;
+        const result = options.customHTMLRenderer.hardBreak();
+        expect(result).toEqual([{ type: 'html', content: '<br>' }]);
+    });
+});

@@ -7,12 +7,14 @@
 | 1.1.1 | 2026-03-04 | v1.1.1対応（exeエディタ未初期化修正・BUG-03追記、nodeIntegration記述修正、アプリバージョン更新）|
 | 1.2.0 | 2026-03-04 | v1.1.2対応（D&D禁止マーク修正・BUG-04追記、contextIsolation記述修正・リリース判定更新）|
 | 1.3.0 | 2026-03-04 | v1.2.0対応（trailing-space CommonMark準拠・preprocessMarkdown実装反映）テスト件数更新42件 |
+| 1.4.0 | 2026-03-04 | v1.3.0対応（不具合 #2 customHTMLRenderer.hardBreak 実装反映）。自動テスト件数更新 30→32件。ST-E03 Auto 欄に IT-MD-005〜006 追記。アプリバージョン更新 |
+
 ## 1. 目的
 本ドキュメントは、mdFileWriterシステムが要件定義書 (`01_requirements.md`) に記載されたすべての要件を満たしていることを確認するためのシステム評価計画および結果報告書である。
 
 ## 2. 評価対象
 - アプリケーション名: mdFileWriter
-- バージョン: v1.2.0 (Release Candidate)
+- バージョン: v1.3.0 (Release Candidate)
 - 対象OS: Windows 10 / 11 (※開発環境はUbuntu 24.04 Dev Container)
 
 ## 3. 評価環境
@@ -68,7 +70,7 @@
 | ST-007 | ファイル操作 | リネーム | リネームボタンを押下する | ファイル名入力ダイアログが表示され、入力後にファイル名が変更されること | Auto/Review | Pass |
 | ST-008 | セキュリティ | パストラバーサル防止 | `../`等を含むパスでIPC操作を試みる | `validatePath()`がエラーをスローし操作が拒否されること | Auto | Pass |
 | ST-009 | 保存 | 上書き保存 | 編集後にCtrl+Sまたは保存ボタンを押す | ファイルの内容がUTF-8 Markdownとして更新されること | Auto/Review | Pass |
-| ST-E03 | エディタ | trailing-space改行レンダリング（v1.2.0） | 行末スペース2個（`  \n`）を含む.mdファイルをD&Dで開く | WYSIWYGエディタ上で`<br>`相当の強制改行として表示されること。`preprocessMarkdown`により3スペース以上は2スペースに正規化されること | Auto/Manual | Auto:Pass / Manual:Pending |
+| ST-E03 | エディタ | trailing-space改行レンダリング（v1.2.0/v1.3.0） | 行末スペース2個（`  \n`）を含む.mdファイルをD&Dで開く | WYSIWYGエディタ上で`<br>`相当の強制改行として表示されること。`preprocessMarkdown`により3スペース以上は2スペースに正規化されること。`customHTMLRenderer.hardBreak`により`<br>`レンダリングが保証されること | Auto/Manual | Auto:Pass（IT-MD-001〜006）/ Manual:Pending |
 | ST-010 | エディタ | WYSIWYG編集 | 文字入力・見出し適用・段落改行を行う | 入力通りに表示され、Markdown記法が適用されること | Manual | Pending |
 | ST-011 | エディタ | 文字装飾 | 太字(Ctrl+B)、斜体(Ctrl+I)、取り消し線を適用する | 選択テキストにスタイルが適用されること | Review | Pass |
 | ST-012 | エディタ | リスト作成 | 箇条書き・番号付きリストを挿入する | リスト形式で表示されること | Manual | Pending |
@@ -98,7 +100,7 @@
 | AC-N-3 | 太字・リスト・画像挿入などの編集操作が正しく反映されること | Pending（Manual） | ST-011〜ST-013 |
 | AC-N-4 | Ctrl+Sまたは保存ボタンでMarkdownとして正しく保存されること | Pass（Auto/Review） | ST-009 |
 | AC-N-5 | 新規作成・リネーム・削除が正しく動作すること | Pass（Auto/Review） | ST-005〜ST-007 |
-| AC-N-6 | 行末スペース2個を含むMDファイルを開いた際、WYSIWYG上で強制改行として表示されること | Auto:Pass / Manual:Pending | ST-E03 |
+| AC-N-6 | 行末スペース2個を含むMDファイルを開いた際、WYSIWYG上で強制改行として表示されること | Auto:Pass（IT-MD-001〜006）/ Manual:Pending | ST-E03 |
 
 #### 異常系
 | # | 受入条件 | 結果 | 対応テストID |
@@ -120,12 +122,13 @@
 
 ### 5.2 Integration Test (Renderer + IPC) — `test/integration.test.js`
 - 対象: `project/src/renderer/renderer.js` とIPC連携
-- 結果: **12/12 Pass**
+- 結果: **14/14 Pass**
 - 確認済項目:
   - D&DドロップによるMDファイル読み込み（IT-DND-001〜003）
   - 新規作成・削除・リネームのIPC呼び出し（IT-IPC-003〜006）
   - 未保存インジケータ動作（IT-STATE-001）
   - `preprocessMarkdown` trailing-space正規化（IT-MD-001〜004）
+  - `customHTMLRenderer.hardBreak` オプション設定・戻り値（IT-MD-005〜006、不具合 #2 対応）
 - エビデンス: `project/document/06_integration_test.md` 参照
 
 ### 5.3 テストサマリー
@@ -133,8 +136,8 @@
 | 工程 | 件数 | 結果 |
 |:--|:--|:--|
 | Unit Test (main.test.js) | 18 | **18/18 Pass** |
-| Integration Test (integration.test.js) | 12 | **12/12 Pass** |
-| **合計** | **30** | **30/30 Pass** |
+| Integration Test (integration.test.js) | 14 | **14/14 Pass** |
+| **合計** | **32** | **32/32 Pass** |
 
 ## 6. 残存課題と対応
 
@@ -152,7 +155,7 @@
 - ST-015: WYSIWYGとMarkdownソードモード切替
 - ST-017b: 終了時未保存確認ダイアログ
 - ST-018: exeインストールレス起動
-- ST-E03: trailing-space改行のWYSIWYG実レンダリング確認（`preprocessMarkdown` ロジックはAutoでPass。Toast UI Editorが実際に`<br>`としてレンダリングするかは実機確認が必要）
+- ST-E03: trailing-space改行のWYSIWYG実レンダリング確認（`preprocessMarkdown` + `customHTMLRenderer.hardBreak` ロジックはAutoで IT-MD-001〜006 Pass済み。Toast UI EditorがWYSIWYG上で実際に`<br>`として表示するかは実機確認が必要）
 - ST-020: パフォーマンス（1万文字編集）
 - AC-N-1, AC-N-3, AC-E-3, AC-N-6（Manual部分）
 
@@ -161,16 +164,17 @@
 - **Electronアプリ起動確認 (devcontainer)**: `npx electron . --no-sandbox --disable-gpu` で起動は可能だが、GUIのスクリーンショット確認には追加ツール（Xvfb等）が必要。
 
 ### 6.3 リリース判定
-- 自動テスト（ロジック検証）は全30件クリアしている。
+- 自動テスト（ロジック検証）は全32件クリアしている。
 - D&D方式への変更（v1.1.0）の主要ロジックは Auto/Review で検証済み。
 - 手動テスト（GUI動作・Windows実機）はリリース直前の最終確認として実施する。
 - BUG-04（D&D禁止マーク不具合）は v1.1.2 で解決済みであり、D&Dによるファイル読み込みフローは Auto/Review で確認済み。
-- `preprocessMarkdown` による trailing-space CommonMark 正規化（v1.2.0）はAutoテストで全4件 Pass 済み。Toast UI Editor 実レンダリング（`<br>`表示）の最終確認は Windows 実機（ST-E03 Manual）で行う。
+- `preprocessMarkdown` による trailing-space CommonMark 正規化（v1.2.0）はAutoテストで全4件 Pass 済み。
+- `customHTMLRenderer.hardBreak` による WYSIWYG `<br>` レンダリング仕様（v1.3.0・不具合 #2 対応）はロジックAutoテスト（IT-MD-005〜006）で Pass 済み。Toast UI Editor 実レンダリング（`<br>`表示）の最終確認は Windows 実機（ST-E03 Manual）で行う。確認後に不具合 #2 をクローズする。
 - 現時点でのシステム品質は、ロジック面において「リリース候補（条件付き合格）」であると判断する。
 
 ## 7. 結論
 
-Unit/Integrationフェーズでの網羅的なロジック検証（計30件，全件合格）により、主要機能の正常性は担保されている。
+Unit/Integrationフェーズでの網羅的なロジック検証（計32件，全件合格）により、主要機能の正常性は担保されている。
 
 v1.1.0でのアーキテクチャ変更（MDファイルD&D直接読込方式）についても、以下が確認済みである：
 - 旧 `dialog:openFolder` / `fs:readDir` ハンドラの削除確認
@@ -185,5 +189,8 @@ v1.1.2でのバグ修正として、以下が確認済みである：
 
 v1.2.0でのバグ修正・機能追加として、以下が確認済みである：
 - trailing-space（行末スペース2個）CommonMark 準拠レンダリング（不具合#1対応）：`preprocessMarkdown` 関数が `/ {2,}\n/g` → `'  \n'` で正規化し、`setMarkdown` 前に適用（IT-MD-001〜004 PASS）。Toast UI Editor 実レンダリングの `<br>` 表示確認は Windows 実機（ST-E03）にて確認予定。
+
+v1.3.0でのバグ修正として、以下が確認済みである：
+- WYSIWYG上での trailing-space 強制改行非表示（不具合 #2 対応）：`initEditor()` に `customHTMLRenderer: { hardBreak() { return [{ type: 'html', content: '<br>' }]; } }` を追加。`customHTMLRenderer.hardBreak` の設定・戻り値をAutoテスト（IT-MD-005〜006 PASS）で検証済み。Toast UI Editor 実レンダリングの最終確認は Windows 実機（ST-E03 Manual）で行い、確認後に不具合 #2 をクローズする。
 
 最終的なUI動作（WYSIWYG操作、ツールバー、モード切替）とWindows固有の動作については、配布パッケージ作成後の実機手動テストに委ねるものとし、本フェーズ（システム評価）としては **条件付き合格** とする。

@@ -6,6 +6,7 @@
 ## 入力
 - `project/document/04_****.md`
 - 参照：`project/document/03_****.md`, `project/document/01_****.md`
+- 参照：`project/src/`（単体評価対象の実装コード）
 - `skills/05_unit_test_skill.md`
 
 ## 出力

@@ -7,11 +7,13 @@
 | 1.1.1 | 2026-03-03 | exe実行時エディタ未初期化バグ修正（nodeIntegration・require化・CSSファイル名） |
 | 1.1.2 | 2026-03-04 | D&D禁止マーク不具合修正（`contextIsolation: false`に変更、preload.jsの`contextBridge`を直接window代入に変更） |
 | 1.2.0 | 2026-03-04 | CommonMark準拠対応（`preprocessMarkdown()`追加・`loadFile`更新）。タスクリストツールバーボタン追加（詳細設計 v1.2.0 対応） |
+| 1.3.0 | 2026-03-04 | 不具合 #2 対応。`initEditor()` に `customHTMLRenderer.hardBreak` を追加し、WYSIWYG上でのtrailing-space改行（`<br>`）レンダリングを実装（詳細設計 v1.3.0 対応） |
 
 ## 1. 実装概要
 詳細設計書（v1.1.0）に基づき、メインプロセス、レンダラープロセス、UIの実装を行った。  
 v1.1.0 では「フォルダ選択＋ファイルツリー方式」を廃止し、**MDファイルD&D方式**へ変更した。  
-v1.2.0 では不具合#1対応として **`preprocessMarkdown()`** によるCommonMark準拠の前処理、および**タスクリストツールバーボタン**を追加した。
+v1.2.0 では不具合#1対応として **`preprocessMarkdown()`** によるCommonMark準拠の前処理、および**タスクリストツールバーボタン**を追加した。  
+v1.3.0 では不具合#2対応として **`customHTMLRenderer.hardBreak`** を追加し、WYSIWYG上でのtrailing-space改行を `<br>` として確実にレンダリングするよう修正した。
 
 ## 2. 実装詳細
 
@@ -39,6 +41,7 @@ v1.2.0 では不具合#1対応として **`preprocessMarkdown()`** によるComm
 - **ツールバー**: `data-cmd` 属性ボタンから `editor.exec()` で書式適用。
 - **[v1.2.0新規] `preprocessMarkdown()`**: `loadFile`内で`setMarkdown()`呼び出し前に実行。行末スペース2個以上を正確に2個に正規化し、Toast UI Editorによるtrailing-space除去を防止する。
 - **[v1.2.0新規] タスクリストボタン**: `index.html`のツールバーに `data-cmd="TaskList"` ボタン（☑）をUL/OLの次に追加。`renderer.js`の`commandMap`に `'TaskList': () => editorInstance.exec('taskList')` を追加。
+- **[v1.3.0変更] `initEditor()` `customHTMLRenderer`**: `hardBreak` ノードを `<br>` としてレンダリングする `customHTMLRenderer` オプションを追加。`preprocessMarkdown` との組み合わせで不具合 #2（WYSIWYG上でtrailing-space改行が表示されない）を解消する。
 - **ファイル操作**（現在開いているファイルに対して実行）:
   - **新規作成**: `currentFilePath` と同ディレクトリにタイムスタンプ付きファイルを作成。
   - **削除**: 現在のファイルを削除（確認ダイアログ付き）。
@@ -114,6 +117,19 @@ v1.1.1で `nodeIntegration: true` まで修正したが、`contextIsolation: tru
 - 標準対応。詳細設計 v1.2.0 の内容を完全に実装した。
 - `editor.exec('taskList')` は Toast UI Editor v3 GFMモードで動作することを確認済み（実機確認はנシステムテスト工程で実施）。
 
+## 3d. 実装記録（v1.3.0）
+
+### 変更内容
+
+| ファイル | 変更種別 | 内容 |
+|---|---|---|
+| `src/renderer/renderer.js` | 変更 | `initEditor()` の `Editor` コンストラクタに `customHTMLRenderer: { hardBreak() { return [{ type: 'html', content: '<br>' }]; } }` オプションを追加 |
+
+### 詳細設計との差分
+- 標準対応。詳細設計 v1.3.0 の `customHTMLRenderer.hardBreak` 仕様を完全に実装した。
+- `preprocessMarkdown`（v1.2.0）と `customHTMLRenderer.hardBreak`（本バージョン）の組み合わせにより、WYSIWYG上での trailing-space 強制改行（CommonMark `hardBreak`）が `<br>` としてレンダリングされることを設計上保証する。
+- **実機確認（ST-E03 Manual）**: Windows 実機での WYSIWYG `<br>` 表示確認が不具合 #2 クローズの必須条件。本工程と同タイミングで実施すること（ユーザー承認済み）。
+
 ## 4. 既知の問題・制約
 - **リネームUI**: Electronで `prompt()` の動作が制限される場合があるため、カスタムモーダルへの改修が望ましい。
 - **新規作成の場所**: ファイルを開いていない状態では新規作成できない設計になっている（D&D後のみ操作可能）。
@@ -138,7 +154,7 @@ v1.1.1で `nodeIntegration: true` まで修正したが、`contextIsolation: tru
 | 未保存検知 | 編集後の`*`表示、ファイル切替時の確認 |
 | ツールバー | 各書式ボタンがToast UIコマンドを発行 |
 | ヂード切替 | WYSIWYGとMarkdownモードの切り替え |
-| `preprocessMarkdown` | trailing-space 2個を含むMD読み込み後、WYSIWYG上で`<br>`相当の改行として表示されるか |
+| `preprocessMarkdown` + `customHTMLRenderer.hardBreak` | トailing-space 2個を含むMD読み込み後、WYSIWYG上で `<br>` 相当の改行として表示されるか（Windows実機確認必須）。保存後のMDファイルに trailing-space が維持されるか |
 | タスクリストボタン | `- [ ]` 形式で挿入されるか、保存後のMDに`- [ ]`記法が保存されるか |
 
 ## 6. ビルド手順

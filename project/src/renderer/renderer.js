@@ -28,8 +28,14 @@ function initEditor() {
         height: '100%',
         initialEditType: 'wysiwyg',
         previewStyle: 'vertical',
-        usageStatistics: false, 
-        toolbarItems: [], 
+        usageStatistics: false,
+        toolbarItems: [],
+        // Fix bug #2: render hardBreak (trailing-space line break) as <br> in WYSIWYG mode
+        customHTMLRenderer: {
+            hardBreak() {
+                return [{ type: 'html', content: '<br>' }];
+            }
+        },
         events: {
             change: () => {
                 if (!isUnsaved) setUnsaved(true);
